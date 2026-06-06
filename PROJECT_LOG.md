@@ -17,9 +17,29 @@ This log records the build history for Repo 52 in plain operational language. It
 
 ## Release Ledger
 
+### Current release - Add strict environment security layer
+
+Status: pushed to `main`
+
+Added the environment security layer:
+
+- New `web-dashboard/app_config.py` Pydantic settings model.
+- Secret handling for `DATABASE_URL` and `JWT_SECRET` through `SecretStr`.
+- Early validation for PostgreSQL DSN format, JWT length, pool bounds, origin format, rate limits, and dashboard port.
+- Centralized raw environment reads outside `server.py`.
+- Redaction guard in structured JSON logging for sensitive field names.
+- Added `pydantic` to `web-dashboard/requirements.txt`.
+- README now documents the validated configuration layer.
+
+Verification:
+
+- `py -3.11 -m py_compile app_config.py server.py seed_transactions.py` passed.
+- Dummy config load test confirmed secret representation is redacted.
+- `npm run build` passed.
+
 ### Pending commit - Wire transaction backend and project log
 
-Status: ready to push
+Status: pushed as `36b2a42`
 
 Added live database backing for the Real Estate Transaction Pipeline:
 

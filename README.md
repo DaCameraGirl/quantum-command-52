@@ -87,6 +87,8 @@ RATE_LIMIT_AUTH_PER_MINUTE=12
 RATE_LIMIT_API_PER_MINUTE=120
 ```
 
+The backend validates runtime configuration through `web-dashboard/app_config.py` using Pydantic. Database URLs and JWT secrets are stored as secret fields, redacted in normal representation, and rejected early if required values are missing or malformed.
+
 Seed the real estate transaction board for registered users:
 
 ```powershell

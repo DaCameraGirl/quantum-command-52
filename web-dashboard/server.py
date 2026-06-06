@@ -17,6 +17,7 @@ from typing import Iterator
 from urllib.parse import urlparse
 
 import jwt
+from app_config import AppSettings, load_settings_from_env
 from psycopg2 import errors
 from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import ThreadedConnectionPool
@@ -34,8 +35,10 @@ DEFAULT_ASSETS = [
 ]
 
 POOL: ThreadedConnectionPool | None = None
+SETTINGS: AppSettings | None = None
 RATE_LIMIT_LOCK = threading.Lock()
 RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
+SENSITIVE_LOG_KEYS = {"secret", "password", "token", "key", "database_url", "dsn"}
 
 
 def utc_now() -> datetime:
@@ -43,10 +46,14 @@ def utc_now() -> datetime:
 
 
 def log_event(event: str, **fields) -> None:
+    safe_fields = {
+        key: "[redacted]" if any(marker in key.lower() for marker in SENSITIVE_LOG_KEYS) else value
+        for key, value in fields.items()
+    }
     payload = {
         "ts": utc_now().isoformat(),
         "event": event,
-        **fields,
+        **safe_fields,
     }
     print(json.dumps(payload, default=str), flush=True)
 
@@ -62,48 +69,44 @@ def load_dotenv_file() -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def required_env(name: str) -> str:
-    value = os.environ.get(name, "").strip()
-    if not value:
-        raise RuntimeError(f"{name} is required.")
-    return value
+def load_app_settings() -> AppSettings:
+    global SETTINGS
+    SETTINGS = load_settings_from_env()
+    return SETTINGS
 
 
-def database_url() -> str:
-    return required_env("DATABASE_URL")
+def settings() -> AppSettings:
+    global SETTINGS
+    if SETTINGS is None:
+        SETTINGS = load_settings_from_env()
+    return SETTINGS
 
 
 def jwt_secret() -> str:
-    value = required_env("JWT_SECRET")
-    if len(value) < 32:
-        raise RuntimeError("JWT_SECRET must be at least 32 characters.")
-    return value
+    return settings().jwt_secret.get_secret_value()
 
 
 def allowed_origins() -> set[str]:
-    configured = os.environ.get(
-        "ALLOWED_ORIGINS",
-        "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:8080,http://localhost:8080",
-    )
-    return {origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()}
+    return settings().allowed_origin_set
 
 
 def cookie_secure() -> bool:
-    return os.environ.get("COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes"}
+    return settings().cookie_secure
 
 
 def access_token_max_age() -> int:
-    return int(os.environ.get("JWT_TTL_SECONDS", "1209600"))
+    return settings().jwt_ttl_seconds
 
 
 def init_pool() -> None:
     global POOL
     if POOL is not None:
         return
+    config = settings()
     POOL = ThreadedConnectionPool(
-        minconn=int(os.environ.get("DATABASE_POOL_MIN", "1")),
-        maxconn=int(os.environ.get("DATABASE_POOL_MAX", "10")),
-        dsn=database_url(),
+        minconn=config.database_pool_min,
+        maxconn=config.database_pool_max,
+        dsn=config.database_url.get_secret_value(),
     )
 
 
@@ -1001,7 +1004,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/api/health":
             return True
         is_auth = path in {"/api/login", "/api/register"}
-        limit = int(os.environ.get("RATE_LIMIT_AUTH_PER_MINUTE" if is_auth else "RATE_LIMIT_API_PER_MINUTE", "12" if is_auth else "120"))
+        config = settings()
+        limit = config.rate_limit_auth_per_minute if is_auth else config.rate_limit_api_per_minute
         now = time.time()
         window_start = now - 60
         key = f"{self.client_ip()}:{path}"
@@ -1789,11 +1793,11 @@ class ApiHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     load_dotenv_file()
-    jwt_secret()
+    config = load_app_settings()
     init_pool()
     init_db()
-    host = os.environ.get("DASHBOARD_HOST", "127.0.0.1")
-    port = int(os.environ.get("DASHBOARD_PORT", "8787"))
+    host = config.dashboard_host
+    port = config.dashboard_port
     log_event("api_started", host=host, port=port, database="postgresql", auth="jwt")
     ThreadingHTTPServer((host, port), ApiHandler).serve_forever()
 
