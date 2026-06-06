@@ -588,6 +588,246 @@ function HousingEvidenceVault() {
   );
 }
 
+function ItemCatalogEngine() {
+  const [items, setItems] = useState([]);
+  const [summary, setSummary] = useState({ itemCount: 0, categoryCount: 0, totalEstimatedValue: 0, topItemValue: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    itemName: "",
+    category: "Photography",
+    estimatedMarketValue: "250",
+    quantity: "1",
+    notes: "",
+  });
+
+  async function loadInventory() {
+    setError("");
+    setLoading(true);
+    try {
+      const payload = await api("/api/inventory");
+      setItems(payload.items || []);
+      setSummary(payload.summary || {});
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadInventory();
+  }, []);
+
+  async function submitItem(event) {
+    event.preventDefault();
+    setError("");
+    try {
+      await api("/api/inventory", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          estimatedMarketValue: Number(form.estimatedMarketValue),
+          quantity: Number(form.quantity),
+        }),
+      });
+      setForm({
+        itemName: "",
+        category: "Photography",
+        estimatedMarketValue: "250",
+        quantity: "1",
+        notes: "",
+      });
+      await loadInventory();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function updateItem(item, patch) {
+    setError("");
+    try {
+      await api(`/api/inventory/${item.item_id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          itemName: item.item_name,
+          category: item.category,
+          estimatedMarketValue: Number(item.estimated_market_value),
+          quantity: Number(item.quantity),
+          notes: item.notes || "",
+          ...patch,
+        }),
+      });
+      await loadInventory();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deleteItem(itemId) {
+    setError("");
+    try {
+      await api(`/api/inventory/${itemId}`, { method: "DELETE" });
+      await loadInventory();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const categoryData = useMemo(() => {
+    const totals = new Map();
+    for (const item of items) {
+      totals.set(item.category, (totals.get(item.category) || 0) + Number(item.total_estimated_value));
+    }
+    return Array.from(totals, ([category, value], index) => ({
+      category,
+      value,
+      fill: COLORS[index % COLORS.length],
+    })).sort((a, b) => b.value - a.value);
+  }, [items]);
+
+  return (
+    <section className="inventory-engine">
+      <div className="grant-head">
+        <div>
+          <p className="eyebrow">Physical asset engine</p>
+          <h2>Item Catalog Valuation Grid</h2>
+          <p>Authenticated inventory records with live valuation totals by item, category, and quantity.</p>
+        </div>
+        <button className="ghost-button" onClick={loadInventory} type="button">
+          <RefreshCw size={16} /> Refresh
+        </button>
+      </div>
+
+      {error && <div className="error-line">{error}</div>}
+
+      <div className="grant-summary-grid">
+        <HudCard icon={Boxes} label="Inventory items" value={summary.itemCount || 0} detail="tracked rows" tone="blue" />
+        <HudCard icon={FileSearch} label="Categories" value={summary.categoryCount || 0} detail="localized groups" tone="green" />
+        <HudCard
+          icon={Gem}
+          label="Total valuation"
+          value={`$${Number(summary.totalEstimatedValue || 0).toLocaleString()}`}
+          detail="market estimate"
+          tone="orange"
+        />
+        <HudCard
+          icon={Gauge}
+          label="Top item"
+          value={`$${Number(summary.topItemValue || 0).toLocaleString()}`}
+          detail="highest total value"
+          tone="violet"
+        />
+      </div>
+
+      <section className="inventory-layout">
+        <form className="inventory-form" onSubmit={submitItem}>
+          <label>
+            Item name
+            <input value={form.itemName} onChange={(event) => setForm({ ...form, itemName: event.target.value })} placeholder="Camera body, lens, rare shell" />
+          </label>
+          <label>
+            Category
+            <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+              <option>Photography</option>
+              <option>Collectibles</option>
+              <option>Electronics</option>
+              <option>Jewelry</option>
+              <option>Tools</option>
+              <option>General</option>
+            </select>
+          </label>
+          <label>
+            Market value
+            <input
+              value={form.estimatedMarketValue}
+              onChange={(event) => setForm({ ...form, estimatedMarketValue: event.target.value })}
+              type="number"
+              min="0"
+              step="1"
+            />
+          </label>
+          <label>
+            Quantity
+            <input value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} type="number" min="1" step="1" />
+          </label>
+          <label className="inventory-notes">
+            Notes
+            <input value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Comparable source, condition, serial, location" />
+          </label>
+          <button className="primary-action" type="submit">
+            <Plus size={17} /> Add asset
+          </button>
+        </form>
+
+        <div className="inventory-chart">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Category allocation</p>
+              <h2>Physical Asset Value</h2>
+            </div>
+            <PieChart size={18} />
+          </div>
+          <ResponsiveContainer width="100%" height={250}>
+            <RePieChart>
+              <Pie data={categoryData} dataKey="value" nameKey="category" innerRadius={50} outerRadius={92} paddingAngle={4}>
+                {categoryData.map((entry) => (
+                  <Cell key={entry.category} fill={entry.fill} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} formatter={(value) => `$${Number(value).toFixed(2)}`} />
+            </RePieChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+
+      <div className="inventory-grid">
+        {loading && <div className="grant-empty">Loading inventory valuation grid...</div>}
+        {!loading && items.length === 0 && <div className="grant-empty">No assets cataloged yet. Add the first physical asset above.</div>}
+        {!loading &&
+          items.map((item) => (
+            <article className="inventory-card" key={item.item_id}>
+              <div>
+                <p className="eyebrow">{item.category}</p>
+                <h3>{item.item_name}</h3>
+                <p>{item.notes || "No notes recorded."}</p>
+              </div>
+              <div className="inventory-value">
+                <strong>${Number(item.total_estimated_value).toLocaleString()}</strong>
+                <span>${Number(item.estimated_market_value).toLocaleString()} x {item.quantity}</span>
+              </div>
+              <div className="inventory-controls">
+                <label>
+                  Value
+                  <input
+                    value={String(item.estimated_market_value)}
+                    onChange={(event) => updateItem(item, { estimatedMarketValue: Number(event.target.value) })}
+                    type="number"
+                    min="0"
+                    step="1"
+                  />
+                </label>
+                <label>
+                  Qty
+                  <input
+                    value={String(item.quantity)}
+                    onChange={(event) => updateItem(item, { quantity: Number(event.target.value) })}
+                    type="number"
+                    min="1"
+                    step="1"
+                  />
+                </label>
+                <button className="icon-button danger" onClick={() => deleteItem(item.item_id)} type="button" aria-label={`Delete ${item.item_name}`}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))}
+      </div>
+    </section>
+  );
+}
+
 function ToolPanel({ activeTab }) {
   if (activeTab === "grants") {
     return <GrantOptimizer />;
@@ -597,18 +837,16 @@ function ToolPanel({ activeTab }) {
     return <HousingEvidenceVault />;
   }
 
+  if (activeTab === "catalog") {
+    return <ItemCatalogEngine />;
+  }
+
   const content = {
     macro: {
       icon: Landmark,
       title: "Macro Engine",
       body: "Strict IBM/Qiskit macro pipeline, Alpaca paper-order adapter, and PostgreSQL telemetry store.",
       command: "py -3.11 strict_macro_quantum_v10.py --preflight",
-    },
-    catalog: {
-      icon: Gem,
-      title: "Item Catalog",
-      body: "Turns comparable sale ranges into a conservative collectible catalog and paper estimate sheet.",
-      command: "python shell_catalog.py estimate",
     },
   }[activeTab];
   const Icon = content.icon;

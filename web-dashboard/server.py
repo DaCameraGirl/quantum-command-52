@@ -205,6 +205,19 @@ def init_db() -> None:
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
 
+            CREATE TABLE IF NOT EXISTS asset_inventory (
+                item_id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+                item_name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                estimated_market_value DOUBLE PRECISION NOT NULL CHECK (estimated_market_value >= 0),
+                quantity INTEGER NOT NULL CHECK (quantity > 0),
+                notes TEXT NOT NULL DEFAULT '',
+                acquired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_user_expires
                 ON user_sessions(user_id, expires_at);
             CREATE INDEX IF NOT EXISTS idx_assets_user_weight
@@ -221,6 +234,10 @@ def init_db() -> None:
                 ON housing_incidents(user_id, status, request_date DESC);
             CREATE INDEX IF NOT EXISTS idx_housing_user_severity
                 ON housing_incidents(user_id, severity_level DESC, request_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_inventory_user_value
+                ON asset_inventory(user_id, estimated_market_value DESC, quantity DESC);
+            CREATE INDEX IF NOT EXISTS idx_inventory_user_category
+                ON asset_inventory(user_id, category);
             """
         )
 
@@ -444,6 +461,43 @@ def enrich_housing_incident(incident: dict) -> dict:
         **incident,
         "days_unresolved": days_unresolved(incident),
         "violation_flag": housing_violation_flag(incident),
+    }
+
+
+def inventory_payload(payload: dict) -> dict:
+    item_name = str(payload.get("itemName") or payload.get("item_name") or "").strip()
+    category = str(payload.get("category", "")).strip() or "General"
+    notes = str(payload.get("notes", "")).strip()
+    if not item_name:
+        raise ValueError("itemName is required")
+
+    try:
+        estimated_market_value = float(payload.get("estimatedMarketValue", payload.get("estimated_market_value", 0)))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("estimatedMarketValue must be a number") from exc
+    if estimated_market_value < 0:
+        raise ValueError("estimatedMarketValue must be non-negative")
+
+    try:
+        quantity = int(payload.get("quantity", 1))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("quantity must be a positive integer") from exc
+    if quantity <= 0:
+        raise ValueError("quantity must be a positive integer")
+
+    return {
+        "item_name": item_name,
+        "category": category,
+        "estimated_market_value": estimated_market_value,
+        "quantity": quantity,
+        "notes": notes,
+    }
+
+
+def enrich_inventory_item(item: dict) -> dict:
+    return {
+        **item,
+        "total_estimated_value": round(float(item["estimated_market_value"]) * int(item["quantity"]), 2),
     }
 
 
@@ -673,6 +727,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ValueError:
             return None
 
+    def inventory_id_from_path(self, path: str) -> int | None:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) != 3 or parts[0] != "api" or parts[1] != "inventory":
+            return None
+        try:
+            return int(parts[2])
+        except ValueError:
+            return None
+
     def do_GET(self) -> None:
         if not self.rate_limit():
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
@@ -813,6 +876,39 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/inventory":
+            user = self.require_user()
+            if not user:
+                return
+            with db_cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT item_id, item_name, category, estimated_market_value, quantity,
+                           notes, acquired_at, created_at, updated_at
+                    FROM asset_inventory
+                    WHERE user_id = %s
+                    ORDER BY estimated_market_value * quantity DESC, acquired_at DESC
+                    """,
+                    (user["id"],),
+                )
+                items = [enrich_inventory_item(row) for row in cursor.fetchall()]
+            total_value = sum(float(item["total_estimated_value"]) for item in items)
+            categories = sorted({item["category"] for item in items})
+            log_event("inventory_list", user_id=user["id"], count=len(items), ip=self.client_ip())
+            self.send_json(
+                HTTPStatus.OK,
+                {
+                    "summary": {
+                        "itemCount": len(items),
+                        "categoryCount": len(categories),
+                        "totalEstimatedValue": round(total_value, 2),
+                        "topItemValue": max([float(item["total_estimated_value"]) for item in items], default=0),
+                    },
+                    "items": items,
+                },
+            )
+            return
+
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_POST(self) -> None:
@@ -935,6 +1031,38 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.CREATED, {"incident": incident})
             return
 
+        if path == "/api/inventory":
+            user = self.require_user()
+            if not user:
+                return
+            try:
+                values = inventory_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO asset_inventory
+                        (user_id, item_name, category, estimated_market_value, quantity, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING item_id, item_name, category, estimated_market_value, quantity,
+                              notes, acquired_at, created_at, updated_at
+                    """,
+                    (
+                        user["id"],
+                        values["item_name"],
+                        values["category"],
+                        values["estimated_market_value"],
+                        values["quantity"],
+                        values["notes"],
+                    ),
+                )
+                item = enrich_inventory_item(cursor.fetchone())
+            log_event("inventory_item_created", user_id=user["id"], item_id=item["item_id"], ip=self.client_ip())
+            self.send_json(HTTPStatus.CREATED, {"item": item})
+            return
+
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_PUT(self) -> None:
@@ -945,13 +1073,53 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         grant_id = self.grant_id_from_path(path)
         housing_id = self.housing_id_from_path(path)
-        if grant_id is None and housing_id is None:
+        inventory_id = self.inventory_id_from_path(path)
+        if grant_id is None and housing_id is None and inventory_id is None:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
             return
 
         user = self.require_user()
         if not user:
             return
+        if inventory_id is not None:
+            try:
+                values = inventory_payload(self.read_json())
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    """
+                    UPDATE asset_inventory
+                    SET item_name = %s,
+                        category = %s,
+                        estimated_market_value = %s,
+                        quantity = %s,
+                        notes = %s,
+                        updated_at = now()
+                    WHERE item_id = %s AND user_id = %s
+                    RETURNING item_id, item_name, category, estimated_market_value, quantity,
+                              notes, acquired_at, created_at, updated_at
+                    """,
+                    (
+                        values["item_name"],
+                        values["category"],
+                        values["estimated_market_value"],
+                        values["quantity"],
+                        values["notes"],
+                        inventory_id,
+                        user["id"],
+                    ),
+                )
+                item = cursor.fetchone()
+            if not item:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Inventory item not found"})
+                return
+            item = enrich_inventory_item(item)
+            log_event("inventory_item_updated", user_id=user["id"], item_id=inventory_id, ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, {"item": item})
+            return
+
         if housing_id is not None:
             try:
                 values = housing_payload(self.read_json())
@@ -1043,13 +1211,28 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         grant_id = self.grant_id_from_path(path)
         housing_id = self.housing_id_from_path(path)
-        if grant_id is None and housing_id is None:
+        inventory_id = self.inventory_id_from_path(path)
+        if grant_id is None and housing_id is None and inventory_id is None:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
             return
 
         user = self.require_user()
         if not user:
             return
+        if inventory_id is not None:
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    "DELETE FROM asset_inventory WHERE item_id = %s AND user_id = %s RETURNING item_id",
+                    (inventory_id, user["id"]),
+                )
+                deleted = cursor.fetchone()
+            if not deleted:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Inventory item not found"})
+                return
+            log_event("inventory_item_deleted", user_id=user["id"], item_id=inventory_id, ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, {"ok": True})
+            return
+
         if housing_id is not None:
             with db_cursor(commit=True) as cursor:
                 cursor.execute(

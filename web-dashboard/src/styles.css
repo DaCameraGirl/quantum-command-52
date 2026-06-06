@@ -519,6 +519,16 @@ select:focus {
   box-shadow: 0 22px 64px rgba(0, 0, 0, 0.32);
 }
 
+.inventory-engine {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(9, 15, 27, 0.82);
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.32);
+}
+
 .grant-head {
   display: flex;
   align-items: flex-start;
@@ -566,6 +576,108 @@ select:focus {
 
 .housing-form .primary-action {
   min-height: 46px;
+}
+
+.inventory-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.92fr) minmax(320px, 0.72fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.inventory-form,
+.inventory-chart {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  padding: 14px;
+  background: #0b1220;
+}
+
+.inventory-form {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr 0.72fr 0.52fr;
+  gap: 10px;
+  align-items: end;
+  margin-top: 0;
+}
+
+.inventory-notes {
+  grid-column: 1 / 4;
+}
+
+.inventory-form .primary-action {
+  min-height: 46px;
+}
+
+.inventory-chart {
+  min-width: 0;
+}
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inventory-grid .grant-empty {
+  grid-column: 1 / -1;
+}
+
+.inventory-card {
+  display: grid;
+  gap: 14px;
+  min-height: 236px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-top: 3px solid #38bdf8;
+  border-radius: 8px;
+  padding: 14px;
+  background: linear-gradient(180deg, #0d1524, #080e19);
+}
+
+.inventory-card h3 {
+  margin: 0 0 7px;
+  color: #f8fbff;
+  font-size: 1.05rem;
+  line-height: 1.28;
+}
+
+.inventory-card p {
+  margin-bottom: 0;
+  color: #9fb2ca;
+  line-height: 1.45;
+}
+
+.inventory-value {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+  background: #050a12;
+}
+
+.inventory-value strong {
+  color: #f8fbff;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.inventory-value span {
+  color: #7c8aa5;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.inventory-controls {
+  display: grid;
+  grid-template-columns: 1fr 0.6fr 38px;
+  gap: 8px;
+  align-items: end;
+}
+
+.inventory-controls input {
+  min-height: 38px;
 }
 
 .vault-actions {
@@ -751,18 +863,25 @@ select:focus {
   .hud-grid,
   .ticker-strip,
   .control-grid,
-  .grant-summary-grid {
+  .grant-summary-grid,
+  .inventory-grid {
     grid-template-columns: 1fr 1fr;
   }
 
   .grant-form,
   .grant-row,
-  .housing-form {
+  .housing-form,
+  .inventory-form {
     grid-template-columns: 1fr 1fr;
   }
 
-  .housing-description {
+  .housing-description,
+  .inventory-notes {
     grid-column: 1 / -1;
+  }
+
+  .inventory-layout {
+    grid-template-columns: 1fr;
   }
 
   .grant-row-head {
@@ -812,6 +931,8 @@ select:focus {
   .grant-form,
   .grant-row,
   .housing-form,
+  .inventory-form,
+  .inventory-grid,
   .timeline-main {
     grid-template-columns: 1fr;
   }
@@ -825,8 +946,14 @@ select:focus {
   }
 
   .timeline-controls label,
-  .timeline-controls .icon-button {
+  .timeline-controls .icon-button,
+  .inventory-controls label,
+  .inventory-controls .icon-button {
     width: 100%;
+  }
+
+  .inventory-controls {
+    grid-template-columns: 1fr;
   }
 
   .span-2 {
