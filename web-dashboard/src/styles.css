@@ -841,6 +841,11 @@ select:focus {
   border-radius: 8px;
   padding: 12px;
   background: linear-gradient(180deg, #0d1524, #080e19);
+  cursor: grab;
+}
+
+.deal-card:active {
+  cursor: grabbing;
 }
 
 .deal-card.breach {

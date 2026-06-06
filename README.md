@@ -28,7 +28,8 @@ The scripts write results into the `output` folder.
 - `quantum_portfolio.py` runs a local quantum-inspired paper portfolio optimizer from `data/portfolio_assets.csv`.
 - `qml_signal_engine.py` runs a local QML-shaped paper signal engine from `data/market_features.csv`.
 - `strict_macro_quantum_v10.py` is the hard-dependency IBM/Qiskit/yfinance/Torch version. It fails fast if the enterprise stack, `.env` token, live market data, or IBM Runtime connection is unavailable.
-- `web-dashboard/` is a React/Tailwind/Recharts dashboard with SQLite-backed user authentication and per-user paper portfolio telemetry.
+- `web-dashboard/` is a React/Tailwind/Recharts command center with PostgreSQL-backed user authentication, portfolio telemetry, grants, housing evidence, physical inventory, and real estate transaction pipeline views.
+- `PROJECT_LOG.md` records the release history for each major GitHub push.
 
 ## Alpaca Paper Trading
 
@@ -84,6 +85,19 @@ JWT_SECRET=replace-with-at-least-32-random-characters
 ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
 RATE_LIMIT_AUTH_PER_MINUTE=12
 RATE_LIMIT_API_PER_MINUTE=120
+```
+
+Seed the real estate transaction board for registered users:
+
+```powershell
+cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
+py -3.11 seed_transactions.py
+```
+
+Seed one user by email:
+
+```powershell
+py -3.11 seed_transactions.py --email user@example.com
 ```
 
 ## Docker Deployment

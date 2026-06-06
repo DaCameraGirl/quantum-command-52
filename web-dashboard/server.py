@@ -218,6 +218,50 @@ def init_db() -> None:
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
 
+            CREATE TABLE IF NOT EXISTS real_estate_listings (
+                listing_id BIGSERIAL PRIMARY KEY,
+                tenant_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+                agent_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+                address_street TEXT NOT NULL,
+                address_city TEXT NOT NULL,
+                address_state TEXT NOT NULL,
+                address_zip TEXT NOT NULL,
+                price NUMERIC(12, 2) NOT NULL CHECK (price >= 0),
+                status TEXT NOT NULL DEFAULT 'active',
+                bedrooms INTEGER,
+                bathrooms NUMERIC(3, 1),
+                square_feet INTEGER,
+                mls_number TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS real_estate_transactions (
+                transaction_id BIGSERIAL PRIMARY KEY,
+                tenant_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+                listing_id BIGINT NOT NULL REFERENCES real_estate_listings(listing_id) ON DELETE RESTRICT,
+                agent_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+                buyer_name TEXT NOT NULL,
+                contract_price NUMERIC(12, 2) NOT NULL CHECK (contract_price >= 0),
+                escrow_company TEXT NOT NULL,
+                earnest_money_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (earnest_money_amount >= 0),
+                target_closing_date DATE NOT NULL,
+                status TEXT NOT NULL DEFAULT 'under_contract',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS transaction_milestones (
+                milestone_id BIGSERIAL PRIMARY KEY,
+                transaction_id BIGINT NOT NULL REFERENCES real_estate_transactions(transaction_id) ON DELETE CASCADE,
+                milestone_name TEXT NOT NULL,
+                due_date DATE NOT NULL,
+                completed_at TIMESTAMPTZ,
+                is_critical_drop_dead BOOLEAN NOT NULL DEFAULT TRUE,
+                notes TEXT NOT NULL DEFAULT '',
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_user_expires
                 ON user_sessions(user_id, expires_at);
             CREATE INDEX IF NOT EXISTS idx_assets_user_weight
@@ -238,6 +282,14 @@ def init_db() -> None:
                 ON asset_inventory(user_id, estimated_market_value DESC, quantity DESC);
             CREATE INDEX IF NOT EXISTS idx_inventory_user_category
                 ON asset_inventory(user_id, category);
+            CREATE INDEX IF NOT EXISTS idx_listings_tenant_status
+                ON real_estate_listings(tenant_id, status, price DESC);
+            CREATE INDEX IF NOT EXISTS idx_transactions_tenant_status
+                ON real_estate_transactions(tenant_id, status, target_closing_date);
+            CREATE INDEX IF NOT EXISTS idx_milestones_transaction_due
+                ON transaction_milestones(transaction_id, due_date);
+            CREATE INDEX IF NOT EXISTS idx_milestones_due
+                ON transaction_milestones(due_date);
             """
         )
 
@@ -501,6 +553,145 @@ def enrich_inventory_item(item: dict) -> dict:
     }
 
 
+def clean_transaction_stage(value: str) -> str:
+    allowed = {"listing", "under_contract", "closing", "closed"}
+    normalized = str(value or "listing").strip().lower().replace(" ", "_").replace("-", "_")
+    return normalized if normalized in allowed else "listing"
+
+
+def listing_status_for_stage(stage: str) -> str:
+    if stage == "closed":
+        return "closed"
+    if stage in {"under_contract", "closing"}:
+        return "pending"
+    return "active"
+
+
+def transaction_payload(payload: dict) -> dict:
+    address_street = str(payload.get("addressStreet") or payload.get("address_street") or "").strip()
+    address_city = str(payload.get("addressCity") or payload.get("address_city") or "").strip()
+    address_state = str(payload.get("addressState") or payload.get("address_state") or "").strip()
+    address_zip = str(payload.get("addressZip") or payload.get("address_zip") or "").strip()
+    buyer_name = str(payload.get("buyerName") or payload.get("buyer_name") or "Client file").strip()
+    escrow_company = str(payload.get("escrowCompany") or payload.get("escrow_company") or "Pending offer").strip()
+    if not all([address_street, address_city, address_state, address_zip]):
+        raise ValueError("addressStreet, addressCity, addressState, and addressZip are required")
+
+    try:
+        price = float(payload.get("price", payload.get("contractPrice", payload.get("contract_price", 0))))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("price must be a number") from exc
+    if price < 0:
+        raise ValueError("price must be non-negative")
+
+    try:
+        earnest_money = float(payload.get("earnestMoney", payload.get("earnest_money_amount", 0)))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("earnestMoney must be a number") from exc
+    if earnest_money < 0:
+        raise ValueError("earnestMoney must be non-negative")
+
+    target_closing_date = parse_deadline(payload.get("targetClosingDate") or payload.get("target_closing_date"))
+    if target_closing_date is None:
+        raise ValueError("targetClosingDate is required")
+
+    milestones = []
+    for item in payload.get("milestones", []):
+        milestone_name = str(item.get("name") or item.get("milestoneName") or item.get("milestone_name") or "").strip()
+        due_date = parse_deadline(item.get("dueDate") or item.get("due_date"))
+        if not milestone_name or due_date is None:
+            continue
+        milestones.append(
+            (
+                milestone_name,
+                due_date,
+                None,
+                bool(item.get("critical", item.get("is_critical_drop_dead", True))),
+                str(item.get("notes", "")).strip(),
+            )
+        )
+
+    return {
+        "address_street": address_street,
+        "address_city": address_city,
+        "address_state": address_state,
+        "address_zip": address_zip,
+        "price": price,
+        "buyer_name": buyer_name,
+        "escrow_company": escrow_company,
+        "earnest_money": earnest_money,
+        "target_closing_date": target_closing_date,
+        "stage": clean_transaction_stage(payload.get("stage", "listing")),
+        "milestones": milestones,
+    }
+
+
+def shift_date(days: int) -> date:
+    return date.today() + timedelta(days=days)
+
+
+def transaction_milestone_risk(milestone: dict) -> str:
+    if milestone.get("completed_at"):
+        return "complete"
+    due_date = milestone["due_date"]
+    if isinstance(due_date, str):
+        due_date = datetime.strptime(due_date[:10], "%Y-%m-%d").date()
+    days = (due_date - date.today()).days
+    if days < 0:
+        return "breach"
+    if milestone["is_critical_drop_dead"] and days <= 2:
+        return "critical"
+    if days <= 7:
+        return "watch"
+    return "clear"
+
+
+def shape_transaction_rows(rows: list[dict]) -> list[dict]:
+    deals: dict[int, dict] = {}
+    for row in rows:
+        transaction_id = int(row["transaction_id"])
+        deal = deals.setdefault(
+            transaction_id,
+            {
+                "id": f"TX-{transaction_id}",
+                "transactionId": transaction_id,
+                "listingId": int(row["listing_id"]),
+                "stage": row["transaction_status"],
+                "address": row["address_street"],
+                "city": row["address_city"],
+                "state": row["address_state"],
+                "zip": row["address_zip"],
+                "price": float(row["contract_price"]),
+                "listingPrice": float(row["listing_price"]),
+                "agent": row["agent_name"],
+                "client": row["buyer_name"],
+                "escrow": row["escrow_company"],
+                "earnestMoney": float(row["earnest_money_amount"]),
+                "closingDate": row["target_closing_date"],
+                "milestones": [],
+            },
+        )
+        if row.get("milestone_id"):
+            milestone = {
+                "id": int(row["milestone_id"]),
+                "name": row["milestone_name"],
+                "dueDate": row["due_date"],
+                "completed": bool(row["completed_at"]),
+                "completedAt": row["completed_at"],
+                "critical": bool(row["is_critical_drop_dead"]),
+                "notes": row["notes"],
+            }
+            milestone["risk"] = transaction_milestone_risk(
+                {
+                    "due_date": milestone["dueDate"],
+                    "completed_at": milestone["completedAt"],
+                    "is_critical_drop_dead": milestone["critical"],
+                }
+            )
+            deal["milestones"].append(milestone)
+    return list(deals.values())
+
+
 def calculate_grant_priority(
     funding_amount: float,
     deadline: date | None,
@@ -597,6 +788,141 @@ def seed_user_assets(cursor: RealDictCursor, user_id: int) -> None:
     )
 
 
+def seed_user_transactions(cursor: RealDictCursor, user_id: int) -> None:
+    cursor.execute("SELECT COUNT(*) AS count FROM real_estate_transactions WHERE tenant_id = %s", (user_id,))
+    if int(cursor.fetchone()["count"]) > 0:
+        return
+
+    seed_deals = [
+        {
+            "stage": "listing",
+            "address": ("418 Harbor View Lane", "Charleston", "SC", "29401"),
+            "price": 485000,
+            "buyer_name": "Seller file",
+            "escrow": "Pending offer",
+            "earnest": 0,
+            "closing": shift_date(42),
+            "milestones": [
+                ("Seller disclosure packet", shift_date(2), None, True, "Upload signed disclosure before offer review."),
+                ("MLS photo review", shift_date(4), None, False, "Confirm image order and feature sheet."),
+                ("Offer review window", shift_date(9), None, True, "Calendar seller response deadline."),
+            ],
+        },
+        {
+            "stage": "under_contract",
+            "address": ("92 Cedar Mill Court", "Raleigh", "NC", "27601"),
+            "price": 612500,
+            "buyer_name": "Buyer file",
+            "escrow": "Atlantic Title",
+            "earnest": 18500,
+            "closing": shift_date(28),
+            "milestones": [
+                ("Inspection contingency", shift_date(1), None, True, "Deposit exposure begins if missed."),
+                ("Appraisal ordered", shift_date(5), None, True, "Confirm lender order and access."),
+                ("Loan approval deadline", shift_date(13), None, True, "Financing condition drop-dead date."),
+            ],
+        },
+        {
+            "stage": "under_contract",
+            "address": ("733 Market Row", "Atlanta", "GA", "30303"),
+            "price": 748000,
+            "buyer_name": "Investor file",
+            "escrow": "Secure Escrow Co.",
+            "earnest": 25000,
+            "closing": shift_date(18),
+            "milestones": [
+                ("HOA document review", shift_date(-1), None, True, "Review period is past due."),
+                ("Financing condition", shift_date(6), None, True, "Track lender commitment."),
+                ("Final walkthrough", shift_date(16), None, False, "Schedule before closing appointment."),
+            ],
+        },
+        {
+            "stage": "closing",
+            "address": ("1509 Ridgecrest Avenue", "Nashville", "TN", "37203"),
+            "price": 524900,
+            "buyer_name": "Relocation file",
+            "escrow": "Keystone Settlement",
+            "earnest": 16000,
+            "closing": shift_date(5),
+            "milestones": [
+                ("Clear to close", shift_date(0), None, True, "Must clear before wire package."),
+                ("Wire instructions verified", shift_date(2), None, True, "Verify out-of-band with settlement office."),
+                ("Closing appointment", shift_date(5), None, True, "Final signature window."),
+            ],
+        },
+        {
+            "stage": "closed",
+            "address": ("21 Maple Station Drive", "Charlotte", "NC", "28202"),
+            "price": 389000,
+            "buyer_name": "Closed buyer file",
+            "escrow": "Closed",
+            "earnest": 12000,
+            "closing": shift_date(-8),
+            "milestones": [
+                ("Inspection contingency", shift_date(-27), utc_now(), True, "Satisfied."),
+                ("Loan approval deadline", shift_date(-18), utc_now(), True, "Satisfied."),
+                ("Recorded closing", shift_date(-8), utc_now(), True, "Recorded."),
+            ],
+        },
+    ]
+
+    for deal in seed_deals:
+        street, city, state, zip_code = deal["address"]
+        cursor.execute(
+            """
+            INSERT INTO real_estate_listings
+                (tenant_id, agent_id, address_street, address_city, address_state,
+                 address_zip, price, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING listing_id
+            """,
+            (
+                user_id,
+                user_id,
+                street,
+                city,
+                state,
+                zip_code,
+                deal["price"],
+                "closed" if deal["stage"] == "closed" else "pending" if deal["stage"] != "listing" else "active",
+            ),
+        )
+        listing_id = cursor.fetchone()["listing_id"]
+        cursor.execute(
+            """
+            INSERT INTO real_estate_transactions
+                (tenant_id, listing_id, agent_id, buyer_name, contract_price,
+                 escrow_company, earnest_money_amount, target_closing_date, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING transaction_id
+            """,
+            (
+                user_id,
+                listing_id,
+                user_id,
+                deal["buyer_name"],
+                deal["price"],
+                deal["escrow"],
+                deal["earnest"],
+                deal["closing"],
+                deal["stage"],
+            ),
+        )
+        transaction_id = cursor.fetchone()["transaction_id"]
+        execute_values(
+            cursor,
+            """
+            INSERT INTO transaction_milestones
+                (transaction_id, milestone_name, due_date, completed_at, is_critical_drop_dead, notes)
+            VALUES %s
+            """,
+            [
+                (transaction_id, name, due_date, completed_at, critical, notes)
+                for name, due_date, completed_at, critical, notes in deal["milestones"]
+            ],
+        )
+
+
 class ApiHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:
         return
@@ -613,7 +939,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             return {}
         headers = {
             "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type,Authorization",
             "Access-Control-Max-Age": "600",
         }
@@ -733,6 +1059,16 @@ class ApiHandler(BaseHTTPRequestHandler):
             return None
         try:
             return int(parts[2])
+        except ValueError:
+            return None
+
+    def transaction_stage_from_path(self, path: str) -> int | None:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) != 4 or parts[0] != "api" or parts[1] != "transactions" or parts[3] != "stage":
+            return None
+        raw_id = parts[2].upper().removeprefix("TX-")
+        try:
+            return int(raw_id)
         except ValueError:
             return None
 
@@ -909,6 +1245,78 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/transactions":
+            user = self.require_user()
+            if not user:
+                return
+            with db_cursor(commit=True) as cursor:
+                seed_user_transactions(cursor, int(user["id"]))
+                cursor.execute(
+                    """
+                    SELECT
+                        t.transaction_id,
+                        t.listing_id,
+                        t.status AS transaction_status,
+                        t.buyer_name,
+                        t.contract_price,
+                        t.escrow_company,
+                        t.earnest_money_amount,
+                        t.target_closing_date,
+                        l.address_street,
+                        l.address_city,
+                        l.address_state,
+                        l.address_zip,
+                        l.price AS listing_price,
+                        u.display_name AS agent_name,
+                        m.milestone_id,
+                        m.milestone_name,
+                        m.due_date,
+                        m.completed_at,
+                        m.is_critical_drop_dead,
+                        m.notes
+                    FROM real_estate_transactions t
+                    JOIN real_estate_listings l ON l.listing_id = t.listing_id
+                    JOIN user_profiles u ON u.id = t.agent_id
+                    LEFT JOIN transaction_milestones m ON m.transaction_id = t.transaction_id
+                    WHERE t.tenant_id = %s
+                    ORDER BY
+                        CASE t.status
+                            WHEN 'listing' THEN 1
+                            WHEN 'under_contract' THEN 2
+                            WHEN 'closing' THEN 3
+                            WHEN 'closed' THEN 4
+                            ELSE 5
+                        END,
+                        t.target_closing_date ASC,
+                        m.due_date ASC
+                    """,
+                    (user["id"],),
+                )
+                deals = shape_transaction_rows(cursor.fetchall())
+            active_deals = [deal for deal in deals if deal["stage"] != "closed"]
+            all_milestones = [milestone for deal in deals for milestone in deal["milestones"]]
+            due_this_week = [
+                milestone
+                for milestone in all_milestones
+                if not milestone["completed"] and 0 <= (milestone["dueDate"] - date.today()).days <= 7
+            ]
+            breached = [milestone for milestone in all_milestones if milestone.get("risk") == "breach"]
+            log_event("transaction_pipeline_list", user_id=user["id"], count=len(deals), ip=self.client_ip())
+            self.send_json(
+                HTTPStatus.OK,
+                {
+                    "summary": {
+                        "activeDealCount": len(active_deals),
+                        "activeDealValue": round(sum(float(deal["price"]) for deal in active_deals), 2),
+                        "earnestExposure": round(sum(float(deal["earnestMoney"]) for deal in active_deals), 2),
+                        "deadlineBreachCount": len(breached),
+                        "dueThisWeekCount": len(due_this_week),
+                    },
+                    "deals": deals,
+                },
+            )
+            return
+
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_POST(self) -> None:
@@ -938,6 +1346,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     )
                     user = cursor.fetchone()
                     seed_user_assets(cursor, int(user["id"]))
+                    seed_user_transactions(cursor, int(user["id"]))
             except errors.UniqueViolation:
                 self.send_json(HTTPStatus.CONFLICT, {"error": "That email is already registered."})
                 return
@@ -1061,6 +1470,71 @@ class ApiHandler(BaseHTTPRequestHandler):
                 item = enrich_inventory_item(cursor.fetchone())
             log_event("inventory_item_created", user_id=user["id"], item_id=item["item_id"], ip=self.client_ip())
             self.send_json(HTTPStatus.CREATED, {"item": item})
+            return
+
+        if path == "/api/transactions":
+            user = self.require_user()
+            if not user:
+                return
+            try:
+                values = transaction_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO real_estate_listings
+                        (tenant_id, agent_id, address_street, address_city, address_state,
+                         address_zip, price, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING listing_id
+                    """,
+                    (
+                        user["id"],
+                        user["id"],
+                        values["address_street"],
+                        values["address_city"],
+                        values["address_state"],
+                        values["address_zip"],
+                        values["price"],
+                        listing_status_for_stage(values["stage"]),
+                    ),
+                )
+                listing_id = cursor.fetchone()["listing_id"]
+                cursor.execute(
+                    """
+                    INSERT INTO real_estate_transactions
+                        (tenant_id, listing_id, agent_id, buyer_name, contract_price,
+                         escrow_company, earnest_money_amount, target_closing_date, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING transaction_id
+                    """,
+                    (
+                        user["id"],
+                        listing_id,
+                        user["id"],
+                        values["buyer_name"],
+                        values["price"],
+                        values["escrow_company"],
+                        values["earnest_money"],
+                        values["target_closing_date"],
+                        values["stage"],
+                    ),
+                )
+                transaction_id = cursor.fetchone()["transaction_id"]
+                if values["milestones"]:
+                    execute_values(
+                        cursor,
+                        """
+                        INSERT INTO transaction_milestones
+                            (transaction_id, milestone_name, due_date, completed_at, is_critical_drop_dead, notes)
+                        VALUES %s
+                        """,
+                        [(transaction_id, *milestone) for milestone in values["milestones"]],
+                    )
+            log_event("transaction_created", user_id=user["id"], transaction_id=transaction_id, ip=self.client_ip())
+            self.send_json(HTTPStatus.CREATED, {"ok": True, "transactionId": transaction_id})
             return
 
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
@@ -1202,6 +1676,51 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         log_event("grant_updated", user_id=user["id"], grant_id=grant_id, ip=self.client_ip())
         self.send_json(HTTPStatus.OK, {"grant": grant})
+
+    def do_PATCH(self) -> None:
+        if not self.rate_limit():
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
+            return
+
+        path = urlparse(self.path).path
+        transaction_id = self.transaction_stage_from_path(path)
+        if transaction_id is None:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
+            return
+
+        user = self.require_user()
+        if not user:
+            return
+
+        payload = self.read_json()
+        stage = clean_transaction_stage(payload.get("stage", "listing"))
+        with db_cursor(commit=True) as cursor:
+            cursor.execute(
+                """
+                UPDATE real_estate_transactions
+                SET status = %s,
+                    updated_at = now()
+                WHERE transaction_id = %s AND tenant_id = %s
+                RETURNING transaction_id, listing_id, status
+                """,
+                (stage, transaction_id, user["id"]),
+            )
+            updated = cursor.fetchone()
+            if not updated:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Transaction not found"})
+                return
+            cursor.execute(
+                """
+                UPDATE real_estate_listings
+                SET status = %s,
+                    updated_at = now()
+                WHERE listing_id = %s AND tenant_id = %s
+                """,
+                (listing_status_for_stage(stage), updated["listing_id"], user["id"]),
+            )
+
+        log_event("transaction_stage_updated", user_id=user["id"], transaction_id=transaction_id, stage=stage, ip=self.client_ip())
+        self.send_json(HTTPStatus.OK, {"ok": True, "transactionId": transaction_id, "stage": stage})
 
     def do_DELETE(self) -> None:
         if not self.rate_limit():

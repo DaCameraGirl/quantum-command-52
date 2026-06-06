@@ -291,16 +291,72 @@ function StatusPill({ status }) {
 }
 
 function TransactionPipelineBoard() {
+  const [sourceDeals, setSourceDeals] = useState(PIPELINE_DEALS);
+  const [summary, setSummary] = useState({
+    activeDealValue: 0,
+    earnestExposure: 0,
+    deadlineBreachCount: 0,
+    dueThisWeekCount: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function loadTransactions() {
+    setError("");
+    setLoading(true);
+    try {
+      const payload = await api("/api/transactions");
+      setSourceDeals(payload.deals || []);
+      setSummary(payload.summary || {});
+    } catch (err) {
+      setError(`${err.message}. Showing local sample transaction data.`);
+      setSourceDeals(PIPELINE_DEALS);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadTransactions();
+  }, []);
+
+  async function moveDealStage(deal, newStage) {
+    if (deal.stage === newStage) return;
+    const originalDeals = sourceDeals;
+    setError("");
+    setSourceDeals((currentDeals) =>
+      currentDeals.map((item) =>
+        item.transactionId === deal.transactionId || item.id === deal.id
+          ? { ...item, stage: newStage }
+          : item,
+      ),
+    );
+
+    try {
+      await api(`/api/transactions/${deal.transactionId || deal.id}/stage`, {
+        method: "PATCH",
+        body: JSON.stringify({ stage: newStage }),
+      });
+      await loadTransactions();
+    } catch (err) {
+      setSourceDeals(originalDeals);
+      setError(`Stage update failed: ${err.message}`);
+    }
+  }
+
   const deals = useMemo(
     () =>
-      PIPELINE_DEALS.map((deal) => {
-        const closingDate = shiftedDate(deal.closingOffset);
-        const milestones = deal.milestones.map((milestone) => {
-          const dueDate = shiftedDate(milestone.offset);
+      sourceDeals.map((deal) => {
+        const closingDate = deal.closingDate ? new Date(deal.closingDate) : shiftedDate(deal.closingOffset || 0);
+        const milestones = (deal.milestones || []).map((milestone) => {
+          const dueDate = milestone.dueDate ? new Date(milestone.dueDate) : shiftedDate(milestone.offset || 0);
           return {
             ...milestone,
+            name: milestone.name || milestone.milestone_name,
             dueDate,
             dueIn: daysUntil(dueDate),
+            completed: Boolean(milestone.completed),
+            critical: Boolean(milestone.critical),
           };
         });
         const openCritical = milestones.filter((milestone) => milestone.critical && !milestone.completed);
@@ -317,17 +373,19 @@ function TransactionPipelineBoard() {
           ...deal,
           closingDate,
           milestones,
+          price: Number(deal.price || 0),
+          earnestMoney: Number(deal.earnestMoney || 0),
           openCriticalCount: openCritical.length,
           nextMilestone,
           risk: worstRisk,
         };
       }),
-    [],
+    [sourceDeals],
   );
 
   const activeDeals = deals.filter((deal) => deal.stage !== "closed");
-  const dealValue = activeDeals.reduce((total, deal) => total + deal.price, 0);
-  const earnestExposure = activeDeals.reduce((total, deal) => total + deal.earnestMoney, 0);
+  const dealValue = Number(summary.activeDealValue || activeDeals.reduce((total, deal) => total + deal.price, 0));
+  const earnestExposure = Number(summary.earnestExposure || activeDeals.reduce((total, deal) => total + deal.earnestMoney, 0));
   const breachedMilestones = deals.flatMap((deal) => deal.milestones.filter((milestone) => milestoneRisk(milestone) === "breach"));
   const dueSoon = deals.flatMap((deal) => deal.milestones.filter((milestone) => !milestone.completed && milestone.dueIn >= 0 && milestone.dueIn <= 7));
   const timelineData = deals
@@ -346,16 +404,19 @@ function TransactionPipelineBoard() {
           <h2>Deal Pipeline Board</h2>
           <p>Stage tracking for listings, active contracts, closing files, and contingency windows.</p>
         </div>
-        <button className="ghost-button" type="button">
-          <CalendarClock size={16} /> Deadline audit
+        <button className="ghost-button" onClick={loadTransactions} type="button">
+          <CalendarClock size={16} /> Refresh audit
         </button>
       </div>
+
+      {error && <div className="error-line">{error}</div>}
+      {loading && <div className="grant-empty">Loading transaction pipeline from PostgreSQL...</div>}
 
       <div className="grant-summary-grid">
         <HudCard icon={Building2} label="Active deal value" value={`$${dealValue.toLocaleString()}`} detail={`${activeDeals.length} open files`} tone="blue" />
         <HudCard icon={DollarSign} label="Earnest exposure" value={`$${earnestExposure.toLocaleString()}`} detail="deposit at risk" tone="orange" />
-        <HudCard icon={AlertTriangle} label="Deadline breaches" value={breachedMilestones.length} detail="requires action" tone="violet" />
-        <HudCard icon={CheckCircle2} label="Due this week" value={dueSoon.length} detail="open milestones" tone="green" />
+        <HudCard icon={AlertTriangle} label="Deadline breaches" value={summary.deadlineBreachCount ?? breachedMilestones.length} detail="requires action" tone="violet" />
+        <HudCard icon={CheckCircle2} label="Due this week" value={summary.dueThisWeekCount ?? dueSoon.length} detail="open milestones" tone="green" />
       </div>
 
       <section className="deal-intel-grid">
@@ -416,13 +477,31 @@ function TransactionPipelineBoard() {
         {PIPELINE_COLUMNS.map((column) => {
           const columnDeals = deals.filter((deal) => deal.stage === column.id);
           return (
-            <div className={`pipeline-column ${column.tone}`} key={column.id}>
+            <div
+              className={`pipeline-column ${column.tone}`}
+              key={column.id}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                const transactionId = event.dataTransfer.getData("text/plain");
+                const draggedDeal = deals.find((deal) => String(deal.transactionId || deal.id) === transactionId);
+                if (draggedDeal) moveDealStage(draggedDeal, column.id);
+              }}
+            >
               <div className="pipeline-column-head">
                 <h3>{column.title}</h3>
                 <span>{columnDeals.length}</span>
               </div>
               {columnDeals.map((deal) => (
-                <article className={`deal-card ${deal.risk}`} key={deal.id}>
+                <article
+                  className={`deal-card ${deal.risk}`}
+                  draggable
+                  key={deal.id}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", String(deal.transactionId || deal.id));
+                  }}
+                >
                   <div className="deal-card-head">
                     <div>
                       <p className="eyebrow">{deal.id}</p>
