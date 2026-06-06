@@ -8,4 +8,4 @@ scipy
 openpyxl
 rich
 python-dotenv
-
+alpaca-py

@@ -30,6 +30,30 @@ The scripts write results into the `output` folder.
 - `strict_macro_quantum_v10.py` is the hard-dependency IBM/Qiskit/yfinance/Torch version. It fails fast if the enterprise stack, `.env` token, live market data, or IBM Runtime connection is unavailable.
 - `web-dashboard/` is a React/Tailwind/Recharts dashboard with SQLite-backed user authentication and per-user paper portfolio telemetry.
 
+## Alpaca Paper Trading
+
+The strict V10 script can create Alpaca paper-trading order previews and, with an explicit flag, submit paper market buy orders. Live trading mode is intentionally blocked.
+
+Add paper credentials to `.env`:
+
+```text
+ALPACA_API_KEY=your_paper_key
+ALPACA_SECRET_KEY=your_paper_secret
+ALPACA_PAPER=true
+```
+
+Preview paper orders:
+
+```powershell
+py -3.11 strict_macro_quantum_v10.py --bankroll 500000 --preview-alpaca-orders
+```
+
+Submit paper orders:
+
+```powershell
+py -3.11 strict_macro_quantum_v10.py --bankroll 500000 --preview-alpaca-orders --submit-paper-orders
+```
+
 ## Web Dashboard
 
 Install and run the dashboard:

@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 REQUIRED_PACKAGES = {
+    "alpaca": "alpaca-py",
     "numpy": "numpy",
     "pandas": "pandas",
     "torch": "torch",
@@ -50,6 +51,9 @@ import torch  # noqa: E402
 import torch.nn as nn  # noqa: E402
 import yfinance as yf  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
+from alpaca.trading.client import TradingClient  # noqa: E402
+from alpaca.trading.enums import OrderSide, TimeInForce  # noqa: E402
+from alpaca.trading.requests import MarketOrderRequest  # noqa: E402
 from qiskit import QuantumCircuit  # noqa: E402
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2  # noqa: E402
 from rich.console import Console  # noqa: E402
@@ -214,7 +218,7 @@ class MacroQuantumEmpireV10:
         returns: list[float],
         volatilities: list[float],
         prices: list[float],
-    ) -> None:
+    ) -> pd.DataFrame:
         OUTPUT_DIR.mkdir(exist_ok=True)
 
         paper_allocations = []
@@ -260,6 +264,91 @@ class MacroQuantumEmpireV10:
             )
         console.print(table)
         console.print(f"[bold green]Workbook written: {WORKBOOK}[/bold green]")
+        return pd.DataFrame(paper_allocations)
+
+    def build_alpaca_order_plan(
+        self,
+        weights: np.ndarray,
+        prices: list[float],
+        max_order_notional: float,
+        min_order_notional: float,
+    ) -> list[dict[str, object]]:
+        order_plan: list[dict[str, object]] = []
+        for index, asset in enumerate(self.assets):
+            target_notional = self.bankroll * float(weights[index])
+            capped_notional = min(target_notional, max_order_notional)
+            quantity = capped_notional / prices[index]
+            status = "ready"
+            if capped_notional < min_order_notional:
+                status = "skipped_below_minimum"
+
+            order_plan.append(
+                {
+                    "symbol": asset,
+                    "side": "buy",
+                    "target_notional": round(target_notional, 2),
+                    "capped_notional": round(capped_notional, 2),
+                    "latest_price": round(prices[index], 2),
+                    "quantity": round(quantity, 6),
+                    "status": status,
+                }
+            )
+        return order_plan
+
+    def execute_alpaca_paper_orders(
+        self,
+        order_plan: list[dict[str, object]],
+        submit: bool,
+    ) -> list[dict[str, object]]:
+        api_key = os.getenv("ALPACA_API_KEY", "").strip()
+        secret_key = os.getenv("ALPACA_SECRET_KEY", "").strip()
+        paper_value = os.getenv("ALPACA_PAPER", "true").strip().lower()
+
+        if not api_key:
+            fail("ALPACA_API_KEY is missing or blank in .env.")
+        if not secret_key:
+            fail("ALPACA_SECRET_KEY is missing or blank in .env.")
+        if paper_value not in {"1", "true", "yes"}:
+            fail("ALPACA_PAPER must be true. This script refuses live trading mode.")
+
+        client = TradingClient(api_key=api_key, secret_key=secret_key, paper=True)
+        account = client.get_account()
+        buying_power = float(getattr(account, "buying_power", 0.0))
+        console.print(f"[cyan]Alpaca paper buying power: ${buying_power:,.2f}[/cyan]")
+
+        results: list[dict[str, object]] = []
+        for order in order_plan:
+            if order["status"] != "ready":
+                results.append({**order, "alpaca_status": "not_submitted"})
+                continue
+            if float(order["capped_notional"]) > buying_power:
+                results.append({**order, "alpaca_status": "blocked_insufficient_buying_power"})
+                continue
+            if not submit:
+                results.append({**order, "alpaca_status": "preview_only"})
+                continue
+
+            request = MarketOrderRequest(
+                symbol=str(order["symbol"]),
+                qty=float(order["quantity"]),
+                side=OrderSide.BUY,
+                time_in_force=TimeInForce.DAY,
+            )
+            submitted = client.submit_order(order_data=request)
+            results.append(
+                {
+                    **order,
+                    "alpaca_status": getattr(submitted, "status", "submitted"),
+                    "alpaca_order_id": str(getattr(submitted, "id", "")),
+                }
+            )
+        return results
+
+    def write_alpaca_order_ledger(self, order_results: list[dict[str, object]]) -> Path:
+        path = OUTPUT_DIR / "alpaca_paper_order_ledger.csv"
+        pd.DataFrame(order_results).to_csv(path, index=False)
+        console.print(f"[bold green]Alpaca paper order ledger written: {path}[/bold green]")
+        return path
 
 
 def preflight() -> None:
@@ -279,9 +368,26 @@ def preflight() -> None:
             break
     if not instance:
         fail("IBM_QUANTUM_INSTANCE is missing or blank in .env.")
+    alpaca_key = ""
+    alpaca_secret = ""
+    alpaca_paper = ""
+    for line in ENV_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if line.startswith("ALPACA_API_KEY="):
+            alpaca_key = line.split("=", 1)[1].strip()
+        if line.startswith("ALPACA_SECRET_KEY="):
+            alpaca_secret = line.split("=", 1)[1].strip()
+        if line.startswith("ALPACA_PAPER="):
+            alpaca_paper = line.split("=", 1)[1].strip().lower()
+    if not alpaca_key:
+        fail("ALPACA_API_KEY is missing or blank in .env.")
+    if not alpaca_secret:
+        fail("ALPACA_SECRET_KEY is missing or blank in .env.")
+    if alpaca_paper not in {"1", "true", "yes"}:
+        fail("ALPACA_PAPER must be true. Live trading mode is intentionally blocked.")
     console.print("[green]Strict dependency imports passed.[/green]")
     console.print("[green]IBM_QUANTUM_TOKEN is present in .env. Token was not printed.[/green]")
     console.print("[green]IBM_QUANTUM_INSTANCE is present in .env. Instance was not printed.[/green]")
+    console.print("[green]Alpaca paper credentials are present in .env. Secrets were not printed.[/green]")
 
 
 def main() -> None:
@@ -293,7 +399,14 @@ def main() -> None:
     parser.add_argument("--period", default="60d")
     parser.add_argument("--backend", default=None)
     parser.add_argument("--preflight", action="store_true")
+    parser.add_argument("--preview-alpaca-orders", action="store_true")
+    parser.add_argument("--submit-paper-orders", action="store_true")
+    parser.add_argument("--max-order-notional", type=float, default=5000.0)
+    parser.add_argument("--min-order-notional", type=float, default=1.0)
     args = parser.parse_args()
+
+    if args.submit_paper_orders and not args.preview_alpaca_orders:
+        args.preview_alpaca_orders = True
 
     if args.preflight:
         preflight()
@@ -317,6 +430,18 @@ def main() -> None:
         progress.update(task, advance=100)
 
     engine.compile_multi_sheet_system_ledger(weights, returns, volatilities, prices)
+    if args.preview_alpaca_orders:
+        order_plan = engine.build_alpaca_order_plan(
+            weights=weights,
+            prices=prices,
+            max_order_notional=args.max_order_notional,
+            min_order_notional=args.min_order_notional,
+        )
+        order_results = engine.execute_alpaca_paper_orders(
+            order_plan=order_plan,
+            submit=args.submit_paper_orders,
+        )
+        engine.write_alpaca_order_ledger(order_results)
 
 
 if __name__ == "__main__":

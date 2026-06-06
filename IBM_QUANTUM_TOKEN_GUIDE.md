@@ -22,6 +22,9 @@ Create a `.env` file in this repo if you later add Qiskit integration:
 ```text
 IBM_QUANTUM_TOKEN=paste_token_here
 IBM_QUANTUM_INSTANCE=paste_instance_crn_or_service_name_here
+ALPACA_API_KEY=paste_alpaca_paper_key_here
+ALPACA_SECRET_KEY=paste_alpaca_paper_secret_here
+ALPACA_PAPER=true
 ```
 
 The `.gitignore` file already ignores `.env`.
