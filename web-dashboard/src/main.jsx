@@ -17,7 +17,10 @@ import {
   Lock,
   LogOut,
   PieChart,
+  Plus,
+  RefreshCw,
   ShieldCheck,
+  Trash2,
   UserPlus,
   Zap,
 } from "lucide-react";
@@ -154,19 +157,226 @@ function StatusPill({ status }) {
   return <span className={`status-pill ${normalized}`}>{status}</span>;
 }
 
+function GrantOptimizer() {
+  const [grants, setGrants] = useState([]);
+  const [summary, setSummary] = useState({ grantCount: 0, activeGrantCount: 0, totalFunding: 0, topPriorityScore: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    grantName: "",
+    fundingAmount: "5000",
+    deadline: "",
+    applicationDifficulty: "3",
+    status: "research",
+  });
+
+  async function loadGrants() {
+    setError("");
+    setLoading(true);
+    try {
+      const payload = await api("/api/grants");
+      setGrants(payload.grants || []);
+      setSummary(payload.summary || {});
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadGrants();
+  }, []);
+
+  async function submitGrant(event) {
+    event.preventDefault();
+    setError("");
+    try {
+      await api("/api/grants", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          fundingAmount: Number(form.fundingAmount),
+          applicationDifficulty: Number(form.applicationDifficulty),
+        }),
+      });
+      setForm({
+        grantName: "",
+        fundingAmount: "5000",
+        deadline: "",
+        applicationDifficulty: "3",
+        status: "research",
+      });
+      await loadGrants();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function updateGrant(grant, patch) {
+    setError("");
+    try {
+      await api(`/api/grants/${grant.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          grantName: grant.grant_name,
+          fundingAmount: Number(grant.funding_amount),
+          deadline: grant.deadline || "",
+          applicationDifficulty: Number(grant.application_difficulty),
+          status: grant.status,
+          ...patch,
+        }),
+      });
+      await loadGrants();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deleteGrant(grantId) {
+    setError("");
+    try {
+      await api(`/api/grants/${grantId}`, { method: "DELETE" });
+      await loadGrants();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <section className="grant-console">
+      <div className="grant-head">
+        <div>
+          <p className="eyebrow">Live PostgreSQL module</p>
+          <h2>Grants Optimizer Ledger</h2>
+          <p>Authenticated CRUD with automatic priority scoring from amount, deadline, difficulty, and status.</p>
+        </div>
+        <button className="ghost-button" onClick={loadGrants} type="button">
+          <RefreshCw size={16} /> Refresh
+        </button>
+      </div>
+
+      {error && <div className="error-line">{error}</div>}
+
+      <div className="grant-summary-grid">
+        <HudCard icon={GraduationCap} label="Tracked grants" value={summary.grantCount || 0} detail="user ledger rows" tone="blue" />
+        <HudCard icon={CheckCircle2} label="Active grants" value={summary.activeGrantCount || 0} detail="not denied or archived" tone="green" />
+        <HudCard
+          icon={Landmark}
+          label="Funding pipeline"
+          value={`$${Number(summary.totalFunding || 0).toLocaleString()}`}
+          detail="active total"
+          tone="orange"
+        />
+        <HudCard icon={Gauge} label="Top priority" value={Number(summary.topPriorityScore || 0).toFixed(2)} detail="server-ranked score" tone="violet" />
+      </div>
+
+      <form className="grant-form" onSubmit={submitGrant}>
+        <label>
+          Grant name
+          <input value={form.grantName} onChange={(event) => setForm({ ...form, grantName: event.target.value })} placeholder="Emergency education aid" />
+        </label>
+        <label>
+          Funding amount
+          <input
+            value={form.fundingAmount}
+            onChange={(event) => setForm({ ...form, fundingAmount: event.target.value })}
+            type="number"
+            min="0"
+            step="100"
+          />
+        </label>
+        <label>
+          Deadline
+          <input value={form.deadline} onChange={(event) => setForm({ ...form, deadline: event.target.value })} type="date" />
+        </label>
+        <label>
+          Difficulty
+          <select value={form.applicationDifficulty} onChange={(event) => setForm({ ...form, applicationDifficulty: event.target.value })}>
+            <option value="1">1 - Easy</option>
+            <option value="2">2 - Light</option>
+            <option value="3">3 - Standard</option>
+            <option value="4">4 - Heavy</option>
+            <option value="5">5 - Complex</option>
+          </select>
+        </label>
+        <label>
+          Status
+          <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+            <option value="research">Research</option>
+            <option value="ready">Ready</option>
+            <option value="applied">Applied</option>
+            <option value="follow_up">Follow up</option>
+            <option value="approved">Approved</option>
+            <option value="denied">Denied</option>
+            <option value="archived">Archived</option>
+          </select>
+        </label>
+        <button className="primary-action" type="submit">
+          <Plus size={17} /> Add and rank
+        </button>
+      </form>
+
+      <div className="grant-table">
+        <div className="grant-row grant-row-head">
+          <span>Grant</span>
+          <span>Amount</span>
+          <span>Deadline</span>
+          <span>Difficulty</span>
+          <span>Priority</span>
+          <span>Status</span>
+          <span></span>
+        </div>
+        {loading && <div className="grant-empty">Loading grant ledger...</div>}
+        {!loading && grants.length === 0 && <div className="grant-empty">No grants yet. Add the first opportunity above.</div>}
+        {!loading &&
+          grants.map((grant) => (
+            <div className="grant-row" key={grant.id}>
+              <strong>{grant.grant_name}</strong>
+              <span>${Number(grant.funding_amount).toLocaleString()}</span>
+              <span>{grant.deadline || "No deadline"}</span>
+              <select
+                value={String(grant.application_difficulty)}
+                onChange={(event) => updateGrant(grant, { applicationDifficulty: Number(event.target.value) })}
+                aria-label={`Difficulty for ${grant.grant_name}`}
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+              <span className="priority-score">{Number(grant.priority_score).toFixed(2)}</span>
+              <select value={grant.status} onChange={(event) => updateGrant(grant, { status: event.target.value })} aria-label={`Status for ${grant.grant_name}`}>
+                <option value="research">Research</option>
+                <option value="ready">Ready</option>
+                <option value="applied">Applied</option>
+                <option value="follow_up">Follow up</option>
+                <option value="approved">Approved</option>
+                <option value="denied">Denied</option>
+                <option value="archived">Archived</option>
+              </select>
+              <button className="icon-button danger" onClick={() => deleteGrant(grant.id)} type="button" aria-label={`Delete ${grant.grant_name}`}>
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ))}
+      </div>
+    </section>
+  );
+}
+
 function ToolPanel({ activeTab }) {
+  if (activeTab === "grants") {
+    return <GrantOptimizer />;
+  }
+
   const content = {
     macro: {
       icon: Landmark,
       title: "Macro Engine",
       body: "Strict IBM/Qiskit macro pipeline, Alpaca paper-order adapter, and PostgreSQL telemetry store.",
       command: "py -3.11 strict_macro_quantum_v10.py --preflight",
-    },
-    grants: {
-      icon: GraduationCap,
-      title: "Grants Optimizer",
-      body: "Ranks real grant, scholarship, and emergency-aid opportunities from the local CSV tracker.",
-      command: "python grants.py rank",
     },
     housing: {
       icon: Home,

@@ -9,7 +9,7 @@ import secrets
 import threading
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -178,6 +178,19 @@ def init_db() -> None:
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
 
+            CREATE TABLE IF NOT EXISTS grant_ledger (
+                id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+                grant_name TEXT NOT NULL,
+                funding_amount DOUBLE PRECISION NOT NULL CHECK (funding_amount >= 0),
+                deadline DATE,
+                application_difficulty INTEGER NOT NULL CHECK (application_difficulty BETWEEN 1 AND 5),
+                priority_score DOUBLE PRECISION NOT NULL,
+                status TEXT NOT NULL DEFAULT 'research',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_user_expires
                 ON user_sessions(user_id, expires_at);
             CREATE INDEX IF NOT EXISTS idx_assets_user_weight
@@ -186,6 +199,10 @@ def init_db() -> None:
                 ON portfolio_history(user_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_telemetry_user_run
                 ON quantum_telemetry_metrics(user_id, run_id);
+            CREATE INDEX IF NOT EXISTS idx_grants_user_priority
+                ON grant_ledger(user_id, priority_score DESC, deadline ASC NULLS LAST);
+            CREATE INDEX IF NOT EXISTS idx_grants_user_status
+                ON grant_ledger(user_id, status);
             """
         )
 
@@ -274,6 +291,97 @@ def summarize_assets(assets: list[dict]) -> dict[str, float | int]:
     }
 
 
+def clean_status(value: str) -> str:
+    allowed = {"research", "ready", "applied", "follow_up", "approved", "denied", "archived"}
+    normalized = str(value or "research").strip().lower().replace(" ", "_").replace("-", "_")
+    return normalized if normalized in allowed else "research"
+
+
+def parse_deadline(value) -> date | None:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, date):
+        return value
+    text = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            pass
+    raise ValueError("deadline must use YYYY-MM-DD, MM/DD/YYYY, or MM/DD/YY")
+
+
+def grant_payload(payload: dict) -> dict:
+    grant_name = str(payload.get("grantName") or payload.get("grant_name") or "").strip()
+    if not grant_name:
+        raise ValueError("grantName is required")
+
+    try:
+        funding_amount = float(payload.get("fundingAmount", payload.get("funding_amount", 0)))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("fundingAmount must be a number") from exc
+    if funding_amount < 0:
+        raise ValueError("fundingAmount must be non-negative")
+
+    try:
+        difficulty = int(payload.get("applicationDifficulty", payload.get("application_difficulty", 3)))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("applicationDifficulty must be an integer from 1 to 5") from exc
+    if not 1 <= difficulty <= 5:
+        raise ValueError("applicationDifficulty must be between 1 and 5")
+
+    deadline = parse_deadline(payload.get("deadline"))
+    status = clean_status(payload.get("status", "research"))
+    priority_score = calculate_grant_priority(
+        funding_amount=funding_amount,
+        deadline=deadline,
+        application_difficulty=difficulty,
+        status=status,
+    )
+    return {
+        "grant_name": grant_name,
+        "funding_amount": funding_amount,
+        "deadline": deadline,
+        "application_difficulty": difficulty,
+        "priority_score": priority_score,
+        "status": status,
+    }
+
+
+def calculate_grant_priority(
+    funding_amount: float,
+    deadline: date | None,
+    application_difficulty: int,
+    status: str,
+) -> float:
+    score = min(funding_amount / 1000.0, 65.0)
+    if deadline is None:
+        score -= 4.0
+    else:
+        days_left = (deadline - date.today()).days
+        if days_left < 0:
+            score -= 80.0
+        elif days_left <= 7:
+            score += 24.0
+        elif days_left <= 30:
+            score += 16.0
+        elif days_left <= 60:
+            score += 9.0
+        else:
+            score += 3.0
+    score -= application_difficulty * 3.0
+    score += {
+        "ready": 10.0,
+        "research": 3.0,
+        "follow_up": 2.0,
+        "applied": -10.0,
+        "approved": -25.0,
+        "denied": -45.0,
+        "archived": -60.0,
+    }.get(status, 0.0)
+    return round(score, 2)
+
+
 def seed_user_assets(cursor: RealDictCursor, user_id: int) -> None:
     now = utc_now()
     seed_rows = [(user_id, *asset, now) for asset in load_seed_assets()]
@@ -352,7 +460,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             return {}
         headers = {
             "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+            "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type,Authorization",
             "Access-Control-Max-Age": "600",
         }
@@ -448,6 +556,15 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Authentication required"})
         return user
 
+    def grant_id_from_path(self, path: str) -> int | None:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) != 3 or parts[0] != "api" or parts[1] != "grants":
+            return None
+        try:
+            return int(parts[2])
+        except ValueError:
+            return None
+
     def do_GET(self) -> None:
         if not self.rate_limit():
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
@@ -519,6 +636,39 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/grants":
+            user = self.require_user()
+            if not user:
+                return
+            with db_cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, grant_name, funding_amount, deadline, application_difficulty,
+                           priority_score, status, created_at, updated_at
+                    FROM grant_ledger
+                    WHERE user_id = %s
+                    ORDER BY priority_score DESC, deadline ASC NULLS LAST, funding_amount DESC
+                    """,
+                    (user["id"],),
+                )
+                grants = cursor.fetchall()
+            active_grants = [grant for grant in grants if grant["status"] not in {"denied", "archived"}]
+            total_funding = sum(float(grant["funding_amount"]) for grant in active_grants)
+            log_event("grant_ledger_list", user_id=user["id"], count=len(grants), ip=self.client_ip())
+            self.send_json(
+                HTTPStatus.OK,
+                {
+                    "summary": {
+                        "grantCount": len(grants),
+                        "activeGrantCount": len(active_grants),
+                        "totalFunding": round(total_funding, 2),
+                        "topPriorityScore": float(grants[0]["priority_score"]) if grants else 0,
+                    },
+                    "grants": grants,
+                },
+            )
+            return
+
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_POST(self) -> None:
@@ -573,7 +723,120 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.OK, {"ok": True}, {"Set-Cookie": clear_cookie_header()})
             return
 
+        if path == "/api/grants":
+            user = self.require_user()
+            if not user:
+                return
+            try:
+                values = grant_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO grant_ledger
+                        (user_id, grant_name, funding_amount, deadline, application_difficulty, priority_score, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, grant_name, funding_amount, deadline, application_difficulty,
+                              priority_score, status, created_at, updated_at
+                    """,
+                    (
+                        user["id"],
+                        values["grant_name"],
+                        values["funding_amount"],
+                        values["deadline"],
+                        values["application_difficulty"],
+                        values["priority_score"],
+                        values["status"],
+                    ),
+                )
+                grant = cursor.fetchone()
+            log_event("grant_created", user_id=user["id"], grant_id=grant["id"], ip=self.client_ip())
+            self.send_json(HTTPStatus.CREATED, {"grant": grant})
+            return
+
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
+
+    def do_PUT(self) -> None:
+        if not self.rate_limit():
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
+            return
+
+        path = urlparse(self.path).path
+        grant_id = self.grant_id_from_path(path)
+        if grant_id is None:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
+            return
+
+        user = self.require_user()
+        if not user:
+            return
+        try:
+            values = grant_payload(self.read_json())
+        except ValueError as exc:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+
+        with db_cursor(commit=True) as cursor:
+            cursor.execute(
+                """
+                UPDATE grant_ledger
+                SET grant_name = %s,
+                    funding_amount = %s,
+                    deadline = %s,
+                    application_difficulty = %s,
+                    priority_score = %s,
+                    status = %s,
+                    updated_at = now()
+                WHERE id = %s AND user_id = %s
+                RETURNING id, grant_name, funding_amount, deadline, application_difficulty,
+                          priority_score, status, created_at, updated_at
+                """,
+                (
+                    values["grant_name"],
+                    values["funding_amount"],
+                    values["deadline"],
+                    values["application_difficulty"],
+                    values["priority_score"],
+                    values["status"],
+                    grant_id,
+                    user["id"],
+                ),
+            )
+            grant = cursor.fetchone()
+
+        if not grant:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Grant not found"})
+            return
+        log_event("grant_updated", user_id=user["id"], grant_id=grant_id, ip=self.client_ip())
+        self.send_json(HTTPStatus.OK, {"grant": grant})
+
+    def do_DELETE(self) -> None:
+        if not self.rate_limit():
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
+            return
+
+        path = urlparse(self.path).path
+        grant_id = self.grant_id_from_path(path)
+        if grant_id is None:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
+            return
+
+        user = self.require_user()
+        if not user:
+            return
+        with db_cursor(commit=True) as cursor:
+            cursor.execute(
+                "DELETE FROM grant_ledger WHERE id = %s AND user_id = %s RETURNING id",
+                (grant_id, user["id"]),
+            )
+            deleted = cursor.fetchone()
+        if not deleted:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Grant not found"})
+            return
+        log_event("grant_deleted", user_id=user["id"], grant_id=grant_id, ip=self.client_ip())
+        self.send_json(HTTPStatus.OK, {"ok": True})
 
     def create_session(self, user: dict) -> None:
         token = create_jwt(user)
