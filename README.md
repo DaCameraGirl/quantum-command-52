@@ -61,6 +61,7 @@ Install and run the dashboard:
 ```powershell
 cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
 npm install
+py -3.11 -m pip install -r requirements.txt
 py -3.11 server.py
 ```
 
@@ -72,6 +73,14 @@ npm run dev
 ```
 
 Open `http://127.0.0.1:5173`.
+
+The API now requires PostgreSQL. Set this in the repo `.env` before starting `server.py`:
+
+```text
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/quantum_command_52
+DATABASE_POOL_MIN=1
+DATABASE_POOL_MAX=10
+```
 
 ## How To Use For Real
 
