@@ -91,13 +91,47 @@ The backend validates runtime configuration through `web-dashboard/app_config.py
 
 ## Stripe Webhooks
 
-Set a Stripe endpoint secret before enabling billing webhooks:
+Set Stripe billing secrets before enabling subscription billing:
 
 ```text
+STRIPE_SECRET_KEY=sk_live_replace_with_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=whsec_replace_with_stripe_endpoint_secret
+STRIPE_SUCCESS_URL=https://your-domain.example/?checkout=success
+STRIPE_CANCEL_URL=https://your-domain.example/?checkout=cancelled
+STRIPE_PRICE_STARTER=price_replace_with_starter_price_id
+STRIPE_PRICE_PRO=price_replace_with_pro_price_id
+STRIPE_PRICE_ENTERPRISE=price_replace_with_enterprise_price_id
 ```
 
+The backend exposes authenticated `POST /api/stripe/checkout`. The browser sends a tier (`starter`, `pro`, or `enterprise`), the server maps it to a configured Stripe Price ID, and Stripe returns a Checkout redirect URL. The browser never chooses arbitrary price IDs.
+
 The backend exposes `POST /api/stripe/webhook`. It verifies the `Stripe-Signature` header, records every accepted event in `stripe_webhook_events`, and updates `billing_accounts` for checkout, subscription, payment-failed, and subscription-paused events.
+
+## API Contract
+
+The API contract lives at `web-dashboard/openapi.json` and is served by the backend at:
+
+- `http://127.0.0.1:8787/openapi.json`
+- `http://127.0.0.1:8787/api/openapi.json`
+
+Authenticated routes accept either the `access_token` JWT cookie or a bearer JWT in the `Authorization` header. Every JSON response includes an `X-Request-ID` correlation header for tracing logs back to a specific request.
+
+## Database Migrations
+
+The backend still has a startup schema initializer for local compatibility, but production schema changes should move through Alembic migrations.
+
+Run migrations from PowerShell:
+
+```powershell
+cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
+py -3.11 -m alembic upgrade head
+```
+
+Create the next migration after a schema change:
+
+```powershell
+py -3.11 -m alembic revision -m "describe schema change"
+```
 
 Seed the real estate transaction board for registered users:
 
@@ -128,9 +162,10 @@ docker compose --env-file .env.production up --build
 
 Services:
 
-- Frontend: `http://127.0.0.1:8080`
-- Backend API: `http://127.0.0.1:8787`
+- App and API: `http://127.0.0.1:8080`
 - PostgreSQL: internal Docker network with persistent `postgres_data` volume
+
+The production `Dockerfile` is a monorepo multi-stage build. Stage 1 compiles the React/Vite dashboard; Stage 2 installs the Python API dependencies, copies the compiled dashboard assets, and serves both the frontend and `/api/*` routes from one hardened runtime container.
 
 ## How To Use For Real
 

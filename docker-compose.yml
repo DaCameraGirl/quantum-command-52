@@ -13,10 +13,10 @@ services:
       timeout: 5s
       retries: 5
 
-  backend:
+  app:
     build:
       context: .
-      dockerfile: web-dashboard/Dockerfile.backend
+      dockerfile: Dockerfile
     environment:
       DASHBOARD_HOST: 0.0.0.0
       DASHBOARD_PORT: 8787
@@ -29,21 +29,18 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}
       RATE_LIMIT_AUTH_PER_MINUTE: ${RATE_LIMIT_AUTH_PER_MINUTE:-12}
       RATE_LIMIT_API_PER_MINUTE: ${RATE_LIMIT_API_PER_MINUTE:-120}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-http://127.0.0.1:8080/?checkout=success}
+      STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-http://127.0.0.1:8080/?checkout=cancelled}
+      STRIPE_PRICE_STARTER: ${STRIPE_PRICE_STARTER:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8787:8787"
-
-  frontend:
-    build:
-      context: .
-      dockerfile: web-dashboard/Dockerfile.frontend
-    depends_on:
-      - backend
-    ports:
-      - "8080:80"
+      - "8080:8787"
 
 volumes:
   postgres_data:

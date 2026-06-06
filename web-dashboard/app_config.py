@@ -25,7 +25,13 @@ class AppSettings(BaseModel):
     rate_limit_api_per_minute: int = Field(default=120, ge=1, le=3000)
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = Field(default=8787, ge=1, le=65535)
+    stripe_secret_key: SecretStr | None = None
     stripe_webhook_secret: SecretStr | None = None
+    stripe_success_url: str = "http://127.0.0.1:5173/?checkout=success"
+    stripe_cancel_url: str = "http://127.0.0.1:5173/?checkout=cancelled"
+    stripe_price_starter: str | None = None
+    stripe_price_pro: str | None = None
+    stripe_price_enterprise: str | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -59,9 +65,37 @@ class AppSettings(BaseModel):
                 raise ValueError("Wildcard origins are not allowed")
         return tuple(dict.fromkeys(parts))
 
+    @field_validator("stripe_success_url", "stripe_cancel_url")
+    @classmethod
+    def validate_stripe_redirect_urls(cls, value: str) -> str:
+        if not value.startswith(("http://", "https://")):
+            raise ValueError("Stripe redirect URLs must start with http:// or https://")
+        return value
+
+    @field_validator("stripe_price_starter", "stripe_price_pro", "stripe_price_enterprise")
+    @classmethod
+    def validate_price_ids(cls, value: str | None) -> str | None:
+        if value in {None, ""}:
+            return None
+        if not value.startswith("price_"):
+            raise ValueError("Stripe price IDs must start with price_")
+        return value
+
     @cached_property
     def allowed_origin_set(self) -> set[str]:
         return set(self.allowed_origins)
+
+    @cached_property
+    def stripe_price_map(self) -> dict[str, str]:
+        return {
+            tier: price_id
+            for tier, price_id in {
+                "starter": self.stripe_price_starter,
+                "pro": self.stripe_price_pro,
+                "enterprise": self.stripe_price_enterprise,
+            }.items()
+            if price_id
+        }
 
 
 def bool_env(name: str, default: str) -> str:
@@ -85,7 +119,13 @@ def load_settings_from_env() -> AppSettings:
             rate_limit_api_per_minute=os.environ.get("RATE_LIMIT_API_PER_MINUTE", "120"),
             dashboard_host=os.environ.get("DASHBOARD_HOST", "127.0.0.1"),
             dashboard_port=os.environ.get("DASHBOARD_PORT", "8787"),
+            stripe_secret_key=SecretStr(os.environ["STRIPE_SECRET_KEY"].strip()) if os.environ.get("STRIPE_SECRET_KEY", "").strip() else None,
             stripe_webhook_secret=SecretStr(os.environ["STRIPE_WEBHOOK_SECRET"].strip()) if os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip() else None,
+            stripe_success_url=os.environ.get("STRIPE_SUCCESS_URL", "http://127.0.0.1:5173/?checkout=success"),
+            stripe_cancel_url=os.environ.get("STRIPE_CANCEL_URL", "http://127.0.0.1:5173/?checkout=cancelled"),
+            stripe_price_starter=os.environ.get("STRIPE_PRICE_STARTER") or None,
+            stripe_price_pro=os.environ.get("STRIPE_PRICE_PRO") or None,
+            stripe_price_enterprise=os.environ.get("STRIPE_PRICE_ENTERPRISE") or None,
         )
     except ValidationError as exc:
         messages = []

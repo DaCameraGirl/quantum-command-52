@@ -4,17 +4,21 @@ import csv
 import hashlib
 import hmac
 import json
+import mimetypes
 import os
 import secrets
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Iterator
-from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode, urlparse
+from urllib.request import Request, urlopen
 
 import jwt
 from app_config import AppSettings, load_settings_from_env
@@ -27,6 +31,8 @@ ROOT = Path(__file__).resolve().parent
 REPO_ROOT = ROOT.parent
 ENV_FILE = REPO_ROOT / ".env"
 SEED_CSV = REPO_ROOT / "output" / "paper_portfolio_plan.csv"
+STATIC_ROOT = ROOT / "dist"
+OPENAPI_SPEC = ROOT / "openapi.json"
 DEFAULT_ASSETS = [
     ("BTC", "Bitcoin", 0.2424, 242.36, 0.24, 0.46),
     ("ETH", "Ethereum", 0.2389, 238.88, 0.18, 0.42),
@@ -39,6 +45,7 @@ SETTINGS: AppSettings | None = None
 RATE_LIMIT_LOCK = threading.Lock()
 RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 SENSITIVE_LOG_KEYS = {"secret", "password", "token", "key", "database_url", "dsn"}
+STRIPE_CHECKOUT_ENDPOINT = "https://api.stripe.com/v1/checkout/sessions"
 
 
 def utc_now() -> datetime:
@@ -848,6 +855,65 @@ def process_stripe_event(cursor: RealDictCursor, event: dict) -> str:
     return "processed"
 
 
+class StripeCheckoutError(RuntimeError):
+    def __init__(self, message: str, status: int = HTTPStatus.BAD_GATEWAY):
+        super().__init__(message)
+        self.status = status
+
+
+def checkout_tier(payload: dict) -> str:
+    tier = str(payload.get("tier", "starter")).strip().lower().replace(" ", "_").replace("-", "_")
+    if tier not in {"starter", "pro", "enterprise"}:
+        raise ValueError("tier must be starter, pro, or enterprise")
+    return tier
+
+
+def create_stripe_checkout_session(user: dict, tier: str) -> dict:
+    config = settings()
+    if config.stripe_secret_key is None:
+        raise StripeCheckoutError("Stripe secret key is not configured", HTTPStatus.SERVICE_UNAVAILABLE)
+
+    price_id = config.stripe_price_map.get(tier)
+    if not price_id:
+        raise StripeCheckoutError(f"Stripe price is not configured for tier '{tier}'", HTTPStatus.SERVICE_UNAVAILABLE)
+
+    form = {
+        "mode": "subscription",
+        "success_url": config.stripe_success_url,
+        "cancel_url": config.stripe_cancel_url,
+        "customer_email": user["email"],
+        "client_reference_id": str(user["id"]),
+        "line_items[0][price]": price_id,
+        "line_items[0][quantity]": "1",
+        "metadata[user_id]": str(user["id"]),
+        "metadata[tier]": tier,
+        "subscription_data[metadata][user_id]": str(user["id"]),
+        "subscription_data[metadata][tier]": tier,
+        "allow_promotion_codes": "true",
+    }
+    request = Request(
+        STRIPE_CHECKOUT_ENDPOINT,
+        data=urlencode(form).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {config.stripe_secret_key.get_secret_value()}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        try:
+            payload = json.loads(exc.read().decode("utf-8"))
+            message = (payload.get("error") or {}).get("message") or "Stripe Checkout request failed"
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            message = "Stripe Checkout request failed"
+        raise StripeCheckoutError(message, HTTPStatus.BAD_GATEWAY) from exc
+    except (URLError, TimeoutError) as exc:
+        raise StripeCheckoutError("Stripe Checkout request could not reach Stripe", HTTPStatus.BAD_GATEWAY) from exc
+
+
 def calculate_grant_priority(
     funding_amount: float,
     deadline: date | None,
@@ -1083,6 +1149,25 @@ class ApiHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:
         return
 
+    def request_id(self) -> str:
+        existing = getattr(self, "_request_id", None)
+        if existing:
+            return existing
+
+        supplied = self.headers.get("X-Request-ID") or self.headers.get("X-Correlation-ID")
+        if supplied:
+            cleaned = "".join(ch for ch in supplied.strip() if ch.isalnum() or ch in {"-", "_"})
+            request_id = cleaned[:80] if cleaned else ""
+        else:
+            request_id = ""
+        if not request_id:
+            request_id = f"req-{uuid.uuid4().hex[:12]}"
+        self._request_id = request_id
+        return request_id
+
+    def log_event(self, event: str, **fields) -> None:
+        log_event(event, request_id=self.request_id(), **fields)
+
     def client_ip(self) -> str:
         forwarded = self.headers.get("X-Forwarded-For", "")
         if forwarded:
@@ -1105,7 +1190,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def send_json(self, status: int, payload: dict, headers: dict[str, str] | None = None) -> None:
         body = json.dumps(payload, default=str).encode("utf-8")
-        merged_headers = {**self.cors_headers(), **(headers or {})}
+        merged_headers = {"X-Request-ID": self.request_id(), **self.cors_headers(), **(headers or {})}
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -1113,7 +1198,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
-        log_event(
+        self.log_event(
             "api_response",
             method=self.command,
             path=urlparse(self.path).path,
@@ -1121,12 +1206,50 @@ class ApiHandler(BaseHTTPRequestHandler):
             ip=self.client_ip(),
         )
 
+    def send_openapi_spec(self) -> None:
+        if not OPENAPI_SPEC.exists():
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "OpenAPI contract not found"})
+            return
+        try:
+            payload = json.loads(OPENAPI_SPEC.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "OpenAPI contract is invalid JSON"})
+            return
+        self.send_json(HTTPStatus.OK, payload)
+
+    def send_static_file(self, path: str) -> None:
+        if not STATIC_ROOT.exists():
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Dashboard static assets not built"})
+            return
+
+        relative = "index.html" if path in {"", "/"} else path.lstrip("/")
+        target = (STATIC_ROOT / relative).resolve()
+        static_root = STATIC_ROOT.resolve()
+        if not str(target).startswith(str(static_root)) or not target.exists() or not target.is_file():
+            target = static_root / "index.html"
+        if not target.exists():
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Dashboard entrypoint not found"})
+            return
+
+        body = target.read_bytes()
+        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Request-ID", self.request_id())
+        for key, value in self.cors_headers().items():
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(body)
+        self.log_event("static_response", path=urlparse(self.path).path, status=200, ip=self.client_ip())
+
     def do_OPTIONS(self) -> None:
         origin = self.headers.get("Origin", "").rstrip("/")
         if origin and origin not in allowed_origins():
             self.send_json(HTTPStatus.FORBIDDEN, {"error": "Origin not allowed"})
             return
         self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("X-Request-ID", self.request_id())
         for key, value in self.cors_headers().items():
             self.send_header(key, value)
         self.end_headers()
@@ -1172,7 +1295,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             bucket = [stamp for stamp in RATE_LIMIT_BUCKETS.get(key, []) if stamp >= window_start]
             if len(bucket) >= limit:
                 RATE_LIMIT_BUCKETS[key] = bucket
-                log_event("rate_limit_block", path=path, ip=self.client_ip(), limit=limit)
+                self.log_event("rate_limit_block", path=path, ip=self.client_ip(), limit=limit)
                 return False
             bucket.append(now)
             RATE_LIMIT_BUCKETS[key] = bucket
@@ -1187,7 +1310,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         raw_body = self.read_body()
         signature = self.headers.get("Stripe-Signature", "")
         if not verify_stripe_signature(raw_body, signature, webhook_secret.get_secret_value()):
-            log_event("stripe_webhook_signature_rejected", ip=self.client_ip())
+            self.log_event("stripe_webhook_signature_rejected", ip=self.client_ip())
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid Stripe signature"})
             return
 
@@ -1204,7 +1327,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
 
-        log_event("stripe_webhook_processed", event_id=event.get("id"), event_type=event.get("type"), outcome=outcome, ip=self.client_ip())
+        self.log_event("stripe_webhook_processed", event_id=event.get("id"), event_type=event.get("type"), outcome=outcome, ip=self.client_ip())
         self.send_json(HTTPStatus.OK, {"ok": True, "outcome": outcome})
 
     def current_user(self) -> dict | None:
@@ -1274,6 +1397,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.OK, {"ok": True, "database": "postgresql", "auth": "jwt"})
             return
 
+        if path in {"/openapi.json", "/api/openapi.json"}:
+            self.send_openapi_spec()
+            return
+
         if path == "/api/me":
             user = self.current_user()
             if not user:
@@ -1323,7 +1450,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
                 telemetry = cursor.fetchall()
 
-            log_event("portfolio_payload", user_id=user["id"], asset_count=len(assets), ip=self.client_ip())
+            self.log_event("portfolio_payload", user_id=user["id"], asset_count=len(assets), ip=self.client_ip())
             self.send_json(
                 HTTPStatus.OK,
                 {
@@ -1353,7 +1480,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 grants = cursor.fetchall()
             active_grants = [grant for grant in grants if grant["status"] not in {"denied", "archived"}]
             total_funding = sum(float(grant["funding_amount"]) for grant in active_grants)
-            log_event("grant_ledger_list", user_id=user["id"], count=len(grants), ip=self.client_ip())
+            self.log_event("grant_ledger_list", user_id=user["id"], count=len(grants), ip=self.client_ip())
             self.send_json(
                 HTTPStatus.OK,
                 {
@@ -1389,7 +1516,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 incidents = [enrich_housing_incident(row) for row in cursor.fetchall()]
             open_incidents = [item for item in incidents if item["status"] not in {"resolved", "closed"}]
             overdue_incidents = [item for item in incidents if item["violation_flag"] not in {"resolved", "tracking"}]
-            log_event("housing_incident_list", user_id=user["id"], count=len(incidents), ip=self.client_ip())
+            self.log_event("housing_incident_list", user_id=user["id"], count=len(incidents), ip=self.client_ip())
             self.send_json(
                 HTTPStatus.OK,
                 {
@@ -1422,7 +1549,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 items = [enrich_inventory_item(row) for row in cursor.fetchall()]
             total_value = sum(float(item["total_estimated_value"]) for item in items)
             categories = sorted({item["category"] for item in items})
-            log_event("inventory_list", user_id=user["id"], count=len(items), ip=self.client_ip())
+            self.log_event("inventory_list", user_id=user["id"], count=len(items), ip=self.client_ip())
             self.send_json(
                 HTTPStatus.OK,
                 {
@@ -1493,7 +1620,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if not milestone["completed"] and 0 <= (milestone["dueDate"] - date.today()).days <= 7
             ]
             breached = [milestone for milestone in all_milestones if milestone.get("risk") == "breach"]
-            log_event("transaction_pipeline_list", user_id=user["id"], count=len(deals), ip=self.client_ip())
+            self.log_event("transaction_pipeline_list", user_id=user["id"], count=len(deals), ip=self.client_ip())
             self.send_json(
                 HTTPStatus.OK,
                 {
@@ -1507,6 +1634,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "deals": deals,
                 },
             )
+            return
+
+        if not path.startswith("/api/"):
+            self.send_static_file(path)
             return
 
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
@@ -1546,7 +1677,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             except errors.UniqueViolation:
                 self.send_json(HTTPStatus.CONFLICT, {"error": "That email is already registered."})
                 return
-            log_event("user_registered", user_id=user["id"], email=email, ip=self.client_ip())
+            self.log_event("user_registered", user_id=user["id"], email=email, ip=self.client_ip())
             self.create_session(user)
             return
 
@@ -1557,15 +1688,33 @@ class ApiHandler(BaseHTTPRequestHandler):
                 cursor.execute("SELECT * FROM user_profiles WHERE email = %s", (email,))
                 user = cursor.fetchone()
             if not user or not verify_password(password, user["password_hash"]):
-                log_event("login_failed", email=email, ip=self.client_ip())
+                self.log_event("login_failed", email=email, ip=self.client_ip())
                 self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Invalid email or password."})
                 return
-            log_event("login_success", user_id=user["id"], email=email, ip=self.client_ip())
+            self.log_event("login_success", user_id=user["id"], email=email, ip=self.client_ip())
             self.create_session(user)
             return
 
         if path == "/api/logout":
             self.send_json(HTTPStatus.OK, {"ok": True}, {"Set-Cookie": clear_cookie_header()})
+            return
+
+        if path == "/api/stripe/checkout":
+            user = self.require_user()
+            if not user:
+                return
+            try:
+                tier = checkout_tier(payload)
+                session = create_stripe_checkout_session(user, tier)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            except StripeCheckoutError as exc:
+                self.send_json(exc.status, {"error": str(exc)})
+                return
+
+            self.log_event("stripe_checkout_created", user_id=user["id"], tier=tier, session_id=session.get("id"), ip=self.client_ip())
+            self.send_json(HTTPStatus.CREATED, {"sessionId": session.get("id"), "url": session.get("url")})
             return
 
         if path == "/api/grants":
@@ -1597,7 +1746,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     ),
                 )
                 grant = cursor.fetchone()
-            log_event("grant_created", user_id=user["id"], grant_id=grant["id"], ip=self.client_ip())
+            self.log_event("grant_created", user_id=user["id"], grant_id=grant["id"], ip=self.client_ip())
             self.send_json(HTTPStatus.CREATED, {"grant": grant})
             return
 
@@ -1632,7 +1781,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     ),
                 )
                 incident = enrich_housing_incident(cursor.fetchone())
-            log_event("housing_incident_created", user_id=user["id"], incident_id=incident["incident_id"], ip=self.client_ip())
+            self.log_event("housing_incident_created", user_id=user["id"], incident_id=incident["incident_id"], ip=self.client_ip())
             self.send_json(HTTPStatus.CREATED, {"incident": incident})
             return
 
@@ -1664,7 +1813,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     ),
                 )
                 item = enrich_inventory_item(cursor.fetchone())
-            log_event("inventory_item_created", user_id=user["id"], item_id=item["item_id"], ip=self.client_ip())
+            self.log_event("inventory_item_created", user_id=user["id"], item_id=item["item_id"], ip=self.client_ip())
             self.send_json(HTTPStatus.CREATED, {"item": item})
             return
 
@@ -1729,7 +1878,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         """,
                         [(transaction_id, *milestone) for milestone in values["milestones"]],
                     )
-            log_event("transaction_created", user_id=user["id"], transaction_id=transaction_id, ip=self.client_ip())
+            self.log_event("transaction_created", user_id=user["id"], transaction_id=transaction_id, ip=self.client_ip())
             self.send_json(HTTPStatus.CREATED, {"ok": True, "transactionId": transaction_id})
             return
 
@@ -1786,7 +1935,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Inventory item not found"})
                 return
             item = enrich_inventory_item(item)
-            log_event("inventory_item_updated", user_id=user["id"], item_id=inventory_id, ip=self.client_ip())
+            self.log_event("inventory_item_updated", user_id=user["id"], item_id=inventory_id, ip=self.client_ip())
             self.send_json(HTTPStatus.OK, {"item": item})
             return
 
@@ -1829,7 +1978,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Housing incident not found"})
                 return
             incident = enrich_housing_incident(incident)
-            log_event("housing_incident_updated", user_id=user["id"], incident_id=housing_id, ip=self.client_ip())
+            self.log_event("housing_incident_updated", user_id=user["id"], incident_id=housing_id, ip=self.client_ip())
             self.send_json(HTTPStatus.OK, {"incident": incident})
             return
 
@@ -1870,7 +2019,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         if not grant:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Grant not found"})
             return
-        log_event("grant_updated", user_id=user["id"], grant_id=grant_id, ip=self.client_ip())
+        self.log_event("grant_updated", user_id=user["id"], grant_id=grant_id, ip=self.client_ip())
         self.send_json(HTTPStatus.OK, {"grant": grant})
 
     def do_PATCH(self) -> None:
@@ -1890,32 +2039,44 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         payload = self.read_json()
         stage = clean_transaction_stage(payload.get("stage", "listing"))
-        with db_cursor(commit=True) as cursor:
-            cursor.execute(
-                """
-                UPDATE real_estate_transactions
-                SET status = %s,
-                    updated_at = now()
-                WHERE transaction_id = %s AND tenant_id = %s
-                RETURNING transaction_id, listing_id, status
-                """,
-                (stage, transaction_id, user["id"]),
+        try:
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    """
+                    UPDATE real_estate_transactions
+                    SET status = %s,
+                        updated_at = now()
+                    WHERE transaction_id = %s AND tenant_id = %s
+                    RETURNING transaction_id, listing_id, status
+                    """,
+                    (stage, transaction_id, user["id"]),
+                )
+                updated = cursor.fetchone()
+                if not updated:
+                    self.send_json(HTTPStatus.NOT_FOUND, {"error": "Transaction not found"})
+                    return
+                cursor.execute(
+                    """
+                    UPDATE real_estate_listings
+                    SET status = %s,
+                        updated_at = now()
+                    WHERE listing_id = %s AND tenant_id = %s
+                    """,
+                    (listing_status_for_stage(stage), updated["listing_id"], user["id"]),
+                )
+        except Exception as exc:
+            self.log_event(
+                "transaction_stage_update_failed",
+                user_id=user["id"],
+                transaction_id=transaction_id,
+                stage=stage,
+                error_type=type(exc).__name__,
+                ip=self.client_ip(),
             )
-            updated = cursor.fetchone()
-            if not updated:
-                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Transaction not found"})
-                return
-            cursor.execute(
-                """
-                UPDATE real_estate_listings
-                SET status = %s,
-                    updated_at = now()
-                WHERE listing_id = %s AND tenant_id = %s
-                """,
-                (listing_status_for_stage(stage), updated["listing_id"], user["id"]),
-            )
+            self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "Transaction stage update failed"})
+            return
 
-        log_event("transaction_stage_updated", user_id=user["id"], transaction_id=transaction_id, stage=stage, ip=self.client_ip())
+        self.log_event("transaction_stage_updated", user_id=user["id"], transaction_id=transaction_id, stage=stage, ip=self.client_ip())
         self.send_json(HTTPStatus.OK, {"ok": True, "transactionId": transaction_id, "stage": stage})
 
     def do_DELETE(self) -> None:
@@ -1944,7 +2105,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             if not deleted:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Inventory item not found"})
                 return
-            log_event("inventory_item_deleted", user_id=user["id"], item_id=inventory_id, ip=self.client_ip())
+            self.log_event("inventory_item_deleted", user_id=user["id"], item_id=inventory_id, ip=self.client_ip())
             self.send_json(HTTPStatus.OK, {"ok": True})
             return
 
@@ -1958,7 +2119,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             if not deleted:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Housing incident not found"})
                 return
-            log_event("housing_incident_deleted", user_id=user["id"], incident_id=housing_id, ip=self.client_ip())
+            self.log_event("housing_incident_deleted", user_id=user["id"], incident_id=housing_id, ip=self.client_ip())
             self.send_json(HTTPStatus.OK, {"ok": True})
             return
 
@@ -1971,7 +2132,7 @@ class ApiHandler(BaseHTTPRequestHandler):
         if not deleted:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Grant not found"})
             return
-        log_event("grant_deleted", user_id=user["id"], grant_id=grant_id, ip=self.client_ip())
+        self.log_event("grant_deleted", user_id=user["id"], grant_id=grant_id, ip=self.client_ip())
         self.send_json(HTTPStatus.OK, {"ok": True})
 
     def create_session(self, user: dict) -> None:

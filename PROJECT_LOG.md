@@ -17,6 +17,41 @@ This log records the build history for Repo 52 in plain operational language. It
 
 ## Release Ledger
 
+### Current release - Add enterprise runtime, tracing, OpenAPI, and migrations
+
+Status: verified locally, pending push
+
+Added production infrastructure layers:
+
+- Root monorepo `Dockerfile` with a Node/Vite build stage and Python runtime stage.
+- Docker Compose now runs PostgreSQL plus one app container that serves the compiled dashboard and API together.
+- Backend static asset fallback for compiled React routes.
+- Request correlation IDs generated from `X-Request-ID`, forwarded from `X-Correlation-ID`, or created as `req-*`.
+- `X-Request-ID` included on JSON and static responses.
+- Handler logs now carry request IDs for request-level traceability.
+- Transaction stage update failures now emit correlated structured logs before returning a controlled 500 response.
+- Static OpenAPI 3.0 contract at `web-dashboard/openapi.json`.
+- Backend routes serving the API contract at `/openapi.json` and `/api/openapi.json`.
+- Alembic migration lifecycle scaffold with an initial enterprise schema revision.
+- `requirements.txt` now includes Alembic for versioned database upgrades.
+- Authenticated `POST /api/stripe/checkout` endpoint for server-side subscription Checkout Session creation.
+- Stripe Checkout configuration for secret key, success/cancel redirects, and tier-to-Price-ID mapping.
+- README updated for Docker, Stripe Checkout, OpenAPI, and migration operations.
+
+Verification:
+
+- `py -3.11 -m py_compile app_config.py server.py seed_transactions.py alembic\env.py alembic\versions\001_initial_enterprise_schema.py` passed.
+- `npm run build` passed.
+- OpenAPI JSON parse check passed.
+- Stripe config smoke test confirmed secret redaction and tier Price ID mapping.
+- Stripe checkout tier parser smoke test passed.
+- `alembic heads` detected `001_initial_enterprise_schema` as the active migration head.
+
+Known local limitations:
+
+- Docker Compose config validation could not run because Docker is not installed or not on PATH in this PowerShell environment.
+- Vite still reports the existing large chunk warning; the build succeeds.
+
 ### Current release - Add Stripe webhook infrastructure
 
 Status: pushed to `main`

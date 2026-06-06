@@ -1,0 +1,381 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Data-Analytics Quantum Command API",
+    "version": "1.0.0",
+    "description": "Authenticated API contract for Repo 52 portfolio, grants, housing, inventory, real estate transaction, and Stripe billing routes."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8787",
+      "description": "Local API server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cookieJwt": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "access_token"
+      },
+      "bearerJwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": { "type": "string" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "displayName": { "type": "string" },
+          "password": { "type": "string", "minLength": 8 }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        }
+      },
+      "GrantInput": {
+        "type": "object",
+        "required": ["grantName", "fundingAmount", "applicationDifficulty"],
+        "properties": {
+          "grantName": { "type": "string" },
+          "fundingAmount": { "type": "number", "minimum": 0 },
+          "deadline": { "type": "string", "format": "date", "nullable": true },
+          "applicationDifficulty": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "status": {
+            "type": "string",
+            "enum": ["research", "ready", "applied", "follow_up", "approved", "denied", "archived"]
+          }
+        }
+      },
+      "HousingInput": {
+        "type": "object",
+        "required": ["category", "description", "areaLocation", "requestDate", "severityLevel"],
+        "properties": {
+          "category": { "type": "string" },
+          "description": { "type": "string" },
+          "areaLocation": { "type": "string" },
+          "requestDate": { "type": "string", "format": "date" },
+          "resolveDate": { "type": "string", "format": "date", "nullable": true },
+          "severityLevel": { "type": "integer", "minimum": 1, "maximum": 10 },
+          "status": {
+            "type": "string",
+            "enum": ["open", "requested", "scheduled", "resolved", "closed", "escalated"]
+          }
+        }
+      },
+      "InventoryInput": {
+        "type": "object",
+        "required": ["itemName", "estimatedMarketValue", "quantity"],
+        "properties": {
+          "itemName": { "type": "string" },
+          "category": { "type": "string" },
+          "estimatedMarketValue": { "type": "number", "minimum": 0 },
+          "quantity": { "type": "integer", "minimum": 1 },
+          "notes": { "type": "string" }
+        }
+      },
+      "TransactionInput": {
+        "type": "object",
+        "required": ["addressStreet", "addressCity", "addressState", "addressZip", "price", "targetClosingDate"],
+        "properties": {
+          "addressStreet": { "type": "string" },
+          "addressCity": { "type": "string" },
+          "addressState": { "type": "string" },
+          "addressZip": { "type": "string" },
+          "price": { "type": "number", "minimum": 0 },
+          "buyerName": { "type": "string" },
+          "escrowCompany": { "type": "string" },
+          "earnestMoney": { "type": "number", "minimum": 0 },
+          "targetClosingDate": { "type": "string", "format": "date" },
+          "stage": { "type": "string", "enum": ["listing", "under_contract", "closing", "closed"] },
+          "milestones": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "dueDate": { "type": "string", "format": "date" },
+                "critical": { "type": "boolean" },
+                "notes": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "StageUpdate": {
+        "type": "object",
+        "required": ["stage"],
+        "properties": {
+          "stage": { "type": "string", "enum": ["listing", "under_contract", "closing", "closed"] }
+        }
+      },
+      "StripeCheckoutRequest": {
+        "type": "object",
+        "required": ["tier"],
+        "properties": {
+          "tier": { "type": "string", "enum": ["starter", "pro", "enterprise"] }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication required",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "BadRequest": {
+        "description": "Invalid request payload",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": { "description": "Service is running" }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "summary": "Return current authenticated user",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "responses": {
+          "200": { "description": "Current user or null" }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "summary": "Register a user and issue a JWT cookie",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RegisterRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Session created" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "description": "Email already registered" }
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "summary": "Authenticate a user and issue a JWT cookie",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Session created" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/logout": {
+      "post": {
+        "summary": "Clear the access cookie",
+        "responses": { "200": { "description": "Session cleared" } }
+      }
+    },
+    "/api/portfolio": {
+      "get": {
+        "summary": "Return authenticated portfolio telemetry",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "responses": {
+          "200": { "description": "Portfolio summary, assets, history, and telemetry" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/grants": {
+      "get": {
+        "summary": "List ranked grant ledger rows",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "responses": { "200": { "description": "Grant list and summary" } }
+      },
+      "post": {
+        "summary": "Create a grant ledger row",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantInput" } } }
+        },
+        "responses": {
+          "201": { "description": "Grant created" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/grants/{id}": {
+      "put": {
+        "summary": "Update a grant ledger row",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GrantInput" } } }
+        },
+        "responses": {
+          "200": { "description": "Grant updated" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "summary": "Delete a grant ledger row",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Grant deleted" } }
+      }
+    },
+    "/api/housing": {
+      "get": {
+        "summary": "List housing evidence incidents",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "responses": { "200": { "description": "Housing incident list and summary" } }
+      },
+      "post": {
+        "summary": "Create a housing incident",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HousingInput" } } }
+        },
+        "responses": { "201": { "description": "Housing incident created" } }
+      }
+    },
+    "/api/housing/{incidentId}": {
+      "put": {
+        "summary": "Update a housing incident",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "parameters": [{ "name": "incidentId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HousingInput" } } }
+        },
+        "responses": { "200": { "description": "Housing incident updated" } }
+      },
+      "delete": {
+        "summary": "Delete a housing incident",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "parameters": [{ "name": "incidentId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Housing incident deleted" } }
+      }
+    },
+    "/api/inventory": {
+      "get": {
+        "summary": "List physical asset inventory",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "responses": { "200": { "description": "Inventory list and valuation summary" } }
+      },
+      "post": {
+        "summary": "Create an inventory item",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InventoryInput" } } }
+        },
+        "responses": { "201": { "description": "Inventory item created" } }
+      }
+    },
+    "/api/inventory/{itemId}": {
+      "put": {
+        "summary": "Update an inventory item",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "parameters": [{ "name": "itemId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/InventoryInput" } } }
+        },
+        "responses": { "200": { "description": "Inventory item updated" } }
+      },
+      "delete": {
+        "summary": "Delete an inventory item",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "parameters": [{ "name": "itemId", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Inventory item deleted" } }
+      }
+    },
+    "/api/transactions": {
+      "get": {
+        "summary": "List real estate transaction pipeline cards",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "responses": { "200": { "description": "Pipeline summary and deal cards" } }
+      },
+      "post": {
+        "summary": "Create a listing, transaction, and milestone set",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TransactionInput" } } }
+        },
+        "responses": { "201": { "description": "Transaction created" } }
+      }
+    },
+    "/api/transactions/{transactionId}/stage": {
+      "patch": {
+        "summary": "Move a transaction card to a new pipeline stage",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "parameters": [{ "name": "transactionId", "in": "path", "required": true, "schema": { "type": "string", "example": "TX-42" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StageUpdate" } } }
+        },
+        "responses": {
+          "200": { "description": "Stage updated" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "description": "Database state transition failed" }
+        }
+      }
+    },
+    "/api/stripe/checkout": {
+      "post": {
+        "summary": "Create a Stripe Checkout subscription session",
+        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StripeCheckoutRequest" } } }
+        },
+        "responses": {
+          "201": { "description": "Stripe Checkout session created" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "503": { "description": "Stripe Checkout is not configured" }
+        }
+      }
+    },
+    "/api/stripe/webhook": {
+      "post": {
+        "summary": "Receive Stripe webhook events",
+        "description": "Verifies Stripe-Signature and idempotently records accepted events.",
+        "responses": {
+          "200": { "description": "Event accepted" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "503": { "description": "Webhook secret is not configured" }
+        }
+      }
+    }
+  }
+}
