@@ -4,10 +4,13 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
+  Building2,
   Boxes,
+  CalendarClock,
   CheckCircle2,
   CircuitBoard,
   Database,
+  DollarSign,
   FileSearch,
   Gauge,
   Gem,
@@ -16,6 +19,7 @@ import {
   Landmark,
   Lock,
   LogOut,
+  MapPin,
   PieChart,
   Plus,
   Printer,
@@ -45,6 +49,134 @@ import "./styles.css";
 
 const COLORS = ["#38bdf8", "#22c55e", "#f97316", "#a78bfa", "#f43f5e", "#facc15"];
 const COMMAND_CAPITAL = 500000;
+
+const PIPELINE_DEALS = [
+  {
+    id: "TX-1042",
+    stage: "listing",
+    address: "418 Harbor View Lane",
+    city: "Charleston",
+    state: "SC",
+    price: 485000,
+    agent: "Angela",
+    client: "Seller file",
+    escrow: "Pending offer",
+    earnestMoney: 0,
+    closingOffset: 42,
+    milestones: [
+      { name: "Seller disclosure packet", offset: 2, completed: false, critical: true },
+      { name: "MLS photo review", offset: 4, completed: false, critical: false },
+      { name: "Offer review window", offset: 9, completed: false, critical: true },
+    ],
+  },
+  {
+    id: "TX-1077",
+    stage: "under_contract",
+    address: "92 Cedar Mill Court",
+    city: "Raleigh",
+    state: "NC",
+    price: 612500,
+    agent: "Angela",
+    client: "Buyer file",
+    escrow: "Atlantic Title",
+    earnestMoney: 18500,
+    closingOffset: 28,
+    milestones: [
+      { name: "Inspection contingency", offset: 1, completed: false, critical: true },
+      { name: "Appraisal ordered", offset: 5, completed: false, critical: true },
+      { name: "Loan approval deadline", offset: 13, completed: false, critical: true },
+    ],
+  },
+  {
+    id: "TX-1091",
+    stage: "under_contract",
+    address: "733 Market Row",
+    city: "Atlanta",
+    state: "GA",
+    price: 748000,
+    agent: "Angela",
+    client: "Investor file",
+    escrow: "Secure Escrow Co.",
+    earnestMoney: 25000,
+    closingOffset: 18,
+    milestones: [
+      { name: "HOA document review", offset: -1, completed: false, critical: true },
+      { name: "Financing condition", offset: 6, completed: false, critical: true },
+      { name: "Final walkthrough", offset: 16, completed: false, critical: false },
+    ],
+  },
+  {
+    id: "TX-1103",
+    stage: "closing",
+    address: "1509 Ridgecrest Avenue",
+    city: "Nashville",
+    state: "TN",
+    price: 524900,
+    agent: "Angela",
+    client: "Relocation file",
+    escrow: "Keystone Settlement",
+    earnestMoney: 16000,
+    closingOffset: 5,
+    milestones: [
+      { name: "Clear to close", offset: 0, completed: false, critical: true },
+      { name: "Wire instructions verified", offset: 2, completed: false, critical: true },
+      { name: "Closing appointment", offset: 5, completed: false, critical: true },
+    ],
+  },
+  {
+    id: "TX-1019",
+    stage: "closed",
+    address: "21 Maple Station Drive",
+    city: "Charlotte",
+    state: "NC",
+    price: 389000,
+    agent: "Angela",
+    client: "Closed buyer file",
+    escrow: "Closed",
+    earnestMoney: 12000,
+    closingOffset: -8,
+    milestones: [
+      { name: "Inspection contingency", offset: -27, completed: true, critical: true },
+      { name: "Loan approval deadline", offset: -18, completed: true, critical: true },
+      { name: "Recorded closing", offset: -8, completed: true, critical: true },
+    ],
+  },
+];
+
+const PIPELINE_COLUMNS = [
+  { id: "listing", title: "Listing", tone: "blue" },
+  { id: "under_contract", title: "Under Contract", tone: "orange" },
+  { id: "closing", title: "Closing", tone: "violet" },
+  { id: "closed", title: "Closed", tone: "green" },
+];
+
+function shiftedDate(offsetDays) {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + offsetDays);
+  return date;
+}
+
+function formatShortDate(date) {
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function daysUntil(date) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target - today) / 86400000);
+}
+
+function milestoneRisk(milestone) {
+  if (milestone.completed) return "complete";
+  const days = daysUntil(milestone.dueDate);
+  if (days < 0) return "breach";
+  if (milestone.critical && days <= 2) return "critical";
+  if (days <= 7) return "watch";
+  return "clear";
+}
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -156,6 +288,178 @@ function HudCard({ icon: Icon, label, value, detail, tone = "blue" }) {
 function StatusPill({ status }) {
   const normalized = status.toLowerCase();
   return <span className={`status-pill ${normalized}`}>{status}</span>;
+}
+
+function TransactionPipelineBoard() {
+  const deals = useMemo(
+    () =>
+      PIPELINE_DEALS.map((deal) => {
+        const closingDate = shiftedDate(deal.closingOffset);
+        const milestones = deal.milestones.map((milestone) => {
+          const dueDate = shiftedDate(milestone.offset);
+          return {
+            ...milestone,
+            dueDate,
+            dueIn: daysUntil(dueDate),
+          };
+        });
+        const openCritical = milestones.filter((milestone) => milestone.critical && !milestone.completed);
+        const nextMilestone = milestones
+          .filter((milestone) => !milestone.completed)
+          .sort((a, b) => a.dueDate - b.dueDate)[0];
+        const worstRisk = milestones.reduce((current, milestone) => {
+          const risk = milestoneRisk(milestone);
+          const rank = { complete: 0, clear: 1, watch: 2, critical: 3, breach: 4 };
+          return rank[risk] > rank[current] ? risk : current;
+        }, "complete");
+
+        return {
+          ...deal,
+          closingDate,
+          milestones,
+          openCriticalCount: openCritical.length,
+          nextMilestone,
+          risk: worstRisk,
+        };
+      }),
+    [],
+  );
+
+  const activeDeals = deals.filter((deal) => deal.stage !== "closed");
+  const dealValue = activeDeals.reduce((total, deal) => total + deal.price, 0);
+  const earnestExposure = activeDeals.reduce((total, deal) => total + deal.earnestMoney, 0);
+  const breachedMilestones = deals.flatMap((deal) => deal.milestones.filter((milestone) => milestoneRisk(milestone) === "breach"));
+  const dueSoon = deals.flatMap((deal) => deal.milestones.filter((milestone) => !milestone.completed && milestone.dueIn >= 0 && milestone.dueIn <= 7));
+  const timelineData = deals
+    .filter((deal) => deal.stage !== "closed")
+    .map((deal) => ({
+      name: deal.id.replace("TX-", "#"),
+      days: Math.max(daysUntil(deal.closingDate), 0),
+      value: Math.round(deal.price / 1000),
+    }));
+
+  return (
+    <section className="transaction-room">
+      <div className="grant-head">
+        <div>
+          <p className="eyebrow">Real estate transaction control</p>
+          <h2>Deal Pipeline Board</h2>
+          <p>Stage tracking for listings, active contracts, closing files, and contingency windows.</p>
+        </div>
+        <button className="ghost-button" type="button">
+          <CalendarClock size={16} /> Deadline audit
+        </button>
+      </div>
+
+      <div className="grant-summary-grid">
+        <HudCard icon={Building2} label="Active deal value" value={`$${dealValue.toLocaleString()}`} detail={`${activeDeals.length} open files`} tone="blue" />
+        <HudCard icon={DollarSign} label="Earnest exposure" value={`$${earnestExposure.toLocaleString()}`} detail="deposit at risk" tone="orange" />
+        <HudCard icon={AlertTriangle} label="Deadline breaches" value={breachedMilestones.length} detail="requires action" tone="violet" />
+        <HudCard icon={CheckCircle2} label="Due this week" value={dueSoon.length} detail="open milestones" tone="green" />
+      </div>
+
+      <section className="deal-intel-grid">
+        <div className="transaction-chart">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Closing runway</p>
+              <h2>Days Until Target Close</h2>
+            </div>
+            <BarChart3 size={18} />
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={timelineData}>
+              <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+              <XAxis dataKey="name" stroke="#7c8aa5" />
+              <YAxis stroke="#7c8aa5" />
+              <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
+              <Bar dataKey="days" fill="#38bdf8" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="deadline-ledger">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Critical windows</p>
+              <h2>Contingency Ledger</h2>
+            </div>
+            <AlertTriangle size={18} />
+          </div>
+          {deals
+            .flatMap((deal) =>
+              deal.milestones.map((milestone) => ({
+                ...milestone,
+                dealId: deal.id,
+                address: deal.address,
+                risk: milestoneRisk(milestone),
+              })),
+            )
+            .sort((a, b) => a.dueDate - b.dueDate)
+            .slice(0, 7)
+            .map((milestone) => (
+              <div className={`deadline-row ${milestone.risk}`} key={`${milestone.dealId}-${milestone.name}`}>
+                <div>
+                  <strong>{milestone.name}</strong>
+                  <span>{milestone.dealId} / {milestone.address}</span>
+                </div>
+                <div>
+                  <b>{formatShortDate(milestone.dueDate)}</b>
+                  <StatusPill status={milestone.risk} />
+                </div>
+              </div>
+            ))}
+        </div>
+      </section>
+
+      <section className="pipeline-board" aria-label="Real estate transaction pipeline board">
+        {PIPELINE_COLUMNS.map((column) => {
+          const columnDeals = deals.filter((deal) => deal.stage === column.id);
+          return (
+            <div className={`pipeline-column ${column.tone}`} key={column.id}>
+              <div className="pipeline-column-head">
+                <h3>{column.title}</h3>
+                <span>{columnDeals.length}</span>
+              </div>
+              {columnDeals.map((deal) => (
+                <article className={`deal-card ${deal.risk}`} key={deal.id}>
+                  <div className="deal-card-head">
+                    <div>
+                      <p className="eyebrow">{deal.id}</p>
+                      <h4>{deal.address}</h4>
+                    </div>
+                    <StatusPill status={deal.risk} />
+                  </div>
+                  <div className="deal-location">
+                    <MapPin size={14} />
+                    <span>{deal.city}, {deal.state}</span>
+                  </div>
+                  <div className="deal-metrics">
+                    <span>
+                      <b>${deal.price.toLocaleString()}</b>
+                      Contract value
+                    </span>
+                    <span>
+                      <b>{formatShortDate(deal.closingDate)}</b>
+                      Target close
+                    </span>
+                  </div>
+                  <div className="next-window">
+                    <span>{deal.nextMilestone?.name || "File complete"}</span>
+                    <strong>{deal.nextMilestone ? `${deal.nextMilestone.dueIn}d` : "Done"}</strong>
+                  </div>
+                  <div className="deal-foot">
+                    <small>{deal.escrow}</small>
+                    <small>{deal.openCriticalCount} critical open</small>
+                  </div>
+                </article>
+              ))}
+            </div>
+          );
+        })}
+      </section>
+    </section>
+  );
 }
 
 function GrantOptimizer() {
@@ -841,6 +1145,10 @@ function ToolPanel({ activeTab }) {
     return <ItemCatalogEngine />;
   }
 
+  if (activeTab === "transactions") {
+    return <TransactionPipelineBoard />;
+  }
+
   const content = {
     macro: {
       icon: Landmark,
@@ -935,6 +1243,9 @@ function Dashboard({ user, onLogout }) {
         </button>
         <button className={activeTab === "catalog" ? "rail-active" : ""} onClick={() => setActiveTab("catalog")} title="Item Catalog">
           <Gem size={20} />
+        </button>
+        <button className={activeTab === "transactions" ? "rail-active" : ""} onClick={() => setActiveTab("transactions")} title="Transaction Pipeline">
+          <Building2 size={20} />
         </button>
       </aside>
 

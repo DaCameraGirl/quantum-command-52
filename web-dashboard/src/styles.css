@@ -264,7 +264,7 @@ select:focus {
   top: 0;
   height: 100vh;
   display: grid;
-  grid-template-rows: 74px repeat(4, 54px) 1fr;
+  grid-template-rows: 74px repeat(5, 54px) 1fr;
   gap: 10px;
   justify-items: center;
   padding: 18px 10px;
@@ -471,6 +471,26 @@ select:focus {
   color: #fdba74;
 }
 
+.status-pill.critical {
+  background: rgba(249, 115, 22, 0.16);
+  color: #fdba74;
+}
+
+.status-pill.breach {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fda4af;
+}
+
+.status-pill.clear {
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+}
+
+.status-pill.complete {
+  background: rgba(34, 197, 94, 0.13);
+  color: #86efac;
+}
+
 .status-pill.blocked {
   background: rgba(244, 63, 94, 0.15);
   color: #fda4af;
@@ -520,6 +540,16 @@ select:focus {
 }
 
 .inventory-engine {
+  display: grid;
+  gap: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(9, 15, 27, 0.82);
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.32);
+}
+
+.transaction-room {
   display: grid;
   gap: 14px;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -678,6 +708,222 @@ select:focus {
 
 .inventory-controls input {
   min-height: 38px;
+}
+
+.deal-intel-grid {
+  display: grid;
+  grid-template-columns: 1fr 0.86fr;
+  gap: 12px;
+}
+
+.transaction-chart,
+.deadline-ledger {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  padding: 14px;
+  background: #0b1220;
+}
+
+.deadline-ledger {
+  display: grid;
+  gap: 8px;
+}
+
+.deadline-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-left: 4px solid #38bdf8;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #08111f;
+}
+
+.deadline-row.breach {
+  border-left-color: #f43f5e;
+}
+
+.deadline-row.critical {
+  border-left-color: #f97316;
+}
+
+.deadline-row.watch {
+  border-left-color: #facc15;
+}
+
+.deadline-row.complete {
+  border-left-color: #22c55e;
+  opacity: 0.78;
+}
+
+.deadline-row strong,
+.deadline-row b {
+  display: block;
+  color: #f8fbff;
+}
+
+.deadline-row span {
+  display: block;
+  margin-top: 3px;
+  color: #7c8aa5;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.deadline-row > div:last-child {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.pipeline-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pipeline-column {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-top: 3px solid #38bdf8;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(8, 17, 31, 0.88);
+}
+
+.pipeline-column.orange {
+  border-top-color: #f97316;
+}
+
+.pipeline-column.violet {
+  border-top-color: #a78bfa;
+}
+
+.pipeline-column.green {
+  border-top-color: #22c55e;
+}
+
+.pipeline-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  margin-bottom: 8px;
+}
+
+.pipeline-column-head h3 {
+  margin: 0;
+  color: #f8fbff;
+  font-size: 0.95rem;
+}
+
+.pipeline-column-head span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 999px;
+  background: #132033;
+  color: #d9e7f7;
+  font-weight: 900;
+}
+
+.deal-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-left: 4px solid #38bdf8;
+  border-radius: 8px;
+  padding: 12px;
+  background: linear-gradient(180deg, #0d1524, #080e19);
+}
+
+.deal-card.breach {
+  border-left-color: #f43f5e;
+}
+
+.deal-card.critical {
+  border-left-color: #f97316;
+}
+
+.deal-card.watch {
+  border-left-color: #facc15;
+}
+
+.deal-card.complete {
+  border-left-color: #22c55e;
+}
+
+.deal-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.deal-card h4 {
+  margin: 0;
+  color: #f8fbff;
+  font-size: 1rem;
+  line-height: 1.24;
+}
+
+.deal-location,
+.deal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: #9fb2ca;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.deal-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.deal-metrics span,
+.next-window {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  padding: 8px;
+  background: #050a12;
+  color: #7c8aa5;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.deal-metrics b,
+.next-window strong {
+  display: block;
+  color: #f8fbff;
+  font-size: 0.95rem;
+  text-transform: none;
+}
+
+.next-window {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.next-window span {
+  color: #aebfd4;
+  text-transform: none;
+}
+
+.deal-foot {
+  justify-content: space-between;
 }
 
 .vault-actions {
@@ -864,7 +1110,8 @@ select:focus {
   .ticker-strip,
   .control-grid,
   .grant-summary-grid,
-  .inventory-grid {
+  .inventory-grid,
+  .pipeline-board {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -881,6 +1128,10 @@ select:focus {
   }
 
   .inventory-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .deal-intel-grid {
     grid-template-columns: 1fr;
   }
 
@@ -907,7 +1158,7 @@ select:focus {
   .side-rail {
     position: static;
     height: auto;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     grid-template-rows: none;
     border-right: 0;
     border-bottom: 1px solid rgba(148, 163, 184, 0.14);
@@ -933,6 +1184,9 @@ select:focus {
   .housing-form,
   .inventory-form,
   .inventory-grid,
+  .pipeline-board,
+  .deal-intel-grid,
+  .deadline-row,
   .timeline-main {
     grid-template-columns: 1fr;
   }
@@ -961,9 +1215,14 @@ select:focus {
   }
 
   .gate-row,
-  .vector-row {
+  .vector-row,
+  .deal-metrics {
     grid-template-columns: 1fr;
     padding: 12px;
+  }
+
+  .deadline-row > div:last-child {
+    justify-items: start;
   }
 }
 
@@ -981,8 +1240,10 @@ select:focus {
   .module-tabs,
   .grant-form,
   .housing-form,
+  .transaction-chart,
   .vault-actions,
-  .timeline-controls {
+  .timeline-controls,
+  .deal-card .status-pill {
     display: none !important;
   }
 
