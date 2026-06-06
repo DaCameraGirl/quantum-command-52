@@ -5,3 +5,7 @@ __pycache__/
 venv/
 .env
 *.xlsx
+web-dashboard/node_modules/
+web-dashboard/dist/
+web-dashboard/*.db
+web-dashboard/*.db-*

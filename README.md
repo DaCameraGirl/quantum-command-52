@@ -28,6 +28,26 @@ The scripts write results into the `output` folder.
 - `quantum_portfolio.py` runs a local quantum-inspired paper portfolio optimizer from `data/portfolio_assets.csv`.
 - `qml_signal_engine.py` runs a local QML-shaped paper signal engine from `data/market_features.csv`.
 - `strict_macro_quantum_v10.py` is the hard-dependency IBM/Qiskit/yfinance/Torch version. It fails fast if the enterprise stack, `.env` token, live market data, or IBM Runtime connection is unavailable.
+- `web-dashboard/` is a React/Tailwind/Recharts dashboard with SQLite-backed user authentication and per-user paper portfolio telemetry.
+
+## Web Dashboard
+
+Install and run the dashboard:
+
+```powershell
+cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
+npm install
+py -3.11 server.py
+```
+
+In a second PowerShell window:
+
+```powershell
+cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
+npm run dev
+```
+
+Open `http://127.0.0.1:5173`.
 
 ## How To Use For Real
 
