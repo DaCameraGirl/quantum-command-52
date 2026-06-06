@@ -265,6 +265,25 @@ def init_db() -> None:
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
 
+            CREATE TABLE IF NOT EXISTS billing_accounts (
+                billing_id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT REFERENCES user_profiles(id) ON DELETE SET NULL,
+                stripe_customer_id TEXT NOT NULL UNIQUE,
+                subscription_tier TEXT NOT NULL DEFAULT 'free',
+                account_status TEXT NOT NULL DEFAULT 'inactive',
+                current_period_end TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+                event_id TEXT PRIMARY KEY,
+                event_type TEXT NOT NULL,
+                payload_json JSONB NOT NULL,
+                received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                processed_at TIMESTAMPTZ
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_user_expires
                 ON user_sessions(user_id, expires_at);
             CREATE INDEX IF NOT EXISTS idx_assets_user_weight
@@ -293,6 +312,10 @@ def init_db() -> None:
                 ON transaction_milestones(transaction_id, due_date);
             CREATE INDEX IF NOT EXISTS idx_milestones_due
                 ON transaction_milestones(due_date);
+            CREATE INDEX IF NOT EXISTS idx_billing_accounts_user
+                ON billing_accounts(user_id, account_status);
+            CREATE INDEX IF NOT EXISTS idx_stripe_events_type_received
+                ON stripe_webhook_events(event_type, received_at DESC);
             """
         )
 
@@ -695,6 +718,136 @@ def shape_transaction_rows(rows: list[dict]) -> list[dict]:
     return list(deals.values())
 
 
+def parse_stripe_signature(header: str) -> dict[str, list[str]]:
+    parsed: dict[str, list[str]] = {}
+    for part in header.split(","):
+        key, _, value = part.partition("=")
+        if key and value:
+            parsed.setdefault(key.strip(), []).append(value.strip())
+    return parsed
+
+
+def verify_stripe_signature(payload: bytes, header: str, secret: str, tolerance_seconds: int = 300) -> bool:
+    parsed = parse_stripe_signature(header)
+    timestamps = parsed.get("t", [])
+    signatures = parsed.get("v1", [])
+    if not timestamps or not signatures:
+        return False
+    try:
+        timestamp = int(timestamps[0])
+    except ValueError:
+        return False
+    if abs(int(time.time()) - timestamp) > tolerance_seconds:
+        return False
+    signed_payload = f"{timestamp}.".encode("utf-8") + payload
+    expected = hmac.new(secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()
+    return any(hmac.compare_digest(expected, signature) for signature in signatures)
+
+
+def unix_to_datetime(value) -> datetime | None:
+    if value in {None, ""}:
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), timezone.utc)
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def metadata_user_id(obj: dict) -> int | None:
+    metadata = obj.get("metadata") or {}
+    raw_user_id = metadata.get("user_id") or metadata.get("tenant_id") or obj.get("client_reference_id")
+    try:
+        return int(raw_user_id) if raw_user_id not in {None, ""} else None
+    except (TypeError, ValueError):
+        return None
+
+
+def stripe_tier(obj: dict) -> str:
+    metadata = obj.get("metadata") or {}
+    if metadata.get("tier"):
+        return str(metadata["tier"]).strip().lower() or "free"
+    if obj.get("mode") == "subscription":
+        return "subscription"
+    return "free"
+
+
+def upsert_billing_account(cursor: RealDictCursor, *, customer_id: str, status: str, tier: str, user_id: int | None, current_period_end: datetime | None) -> None:
+    cursor.execute(
+        """
+        INSERT INTO billing_accounts
+            (user_id, stripe_customer_id, subscription_tier, account_status, current_period_end)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (stripe_customer_id) DO UPDATE SET
+            user_id = COALESCE(EXCLUDED.user_id, billing_accounts.user_id),
+            subscription_tier = EXCLUDED.subscription_tier,
+            account_status = EXCLUDED.account_status,
+            current_period_end = EXCLUDED.current_period_end,
+            updated_at = now()
+        """,
+        (user_id, customer_id, tier, status, current_period_end),
+    )
+
+
+def process_stripe_event(cursor: RealDictCursor, event: dict) -> str:
+    event_id = str(event.get("id", "")).strip()
+    event_type = str(event.get("type", "")).strip()
+    obj = ((event.get("data") or {}).get("object") or {})
+    if not event_id or not event_type or not isinstance(obj, dict):
+        raise ValueError("Stripe event payload is missing id, type, or data.object")
+
+    cursor.execute(
+        """
+        INSERT INTO stripe_webhook_events (event_id, event_type, payload_json)
+        VALUES (%s, %s, %s::jsonb)
+        ON CONFLICT (event_id) DO NOTHING
+        RETURNING event_id
+        """,
+        (event_id, event_type, json.dumps(event)),
+    )
+    inserted = cursor.fetchone()
+    if not inserted:
+        return "duplicate"
+
+    if event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
+        customer_id = str(obj.get("customer", "")).strip()
+        if customer_id:
+            status = "inactive" if event_type.endswith(".deleted") else str(obj.get("status", "inactive")).strip().lower()
+            upsert_billing_account(
+                cursor,
+                customer_id=customer_id,
+                status=status,
+                tier=stripe_tier(obj),
+                user_id=metadata_user_id(obj),
+                current_period_end=unix_to_datetime(obj.get("current_period_end")),
+            )
+    elif event_type == "checkout.session.completed":
+        customer_id = str(obj.get("customer", "")).strip()
+        if customer_id:
+            upsert_billing_account(
+                cursor,
+                customer_id=customer_id,
+                status="active",
+                tier=stripe_tier(obj),
+                user_id=metadata_user_id(obj),
+                current_period_end=unix_to_datetime(obj.get("expires_at")),
+            )
+    elif event_type in {"invoice.payment_failed", "customer.subscription.paused"}:
+        customer_id = str(obj.get("customer", "")).strip()
+        if customer_id:
+            cursor.execute(
+                """
+                UPDATE billing_accounts
+                SET account_status = %s,
+                    updated_at = now()
+                WHERE stripe_customer_id = %s
+                """,
+                ("past_due" if event_type == "invoice.payment_failed" else "paused", customer_id),
+            )
+
+    cursor.execute("UPDATE stripe_webhook_events SET processed_at = now() WHERE event_id = %s", (event_id,))
+    return "processed"
+
+
 def calculate_grant_priority(
     funding_amount: float,
     deadline: date | None,
@@ -978,12 +1131,18 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_header(key, value)
         self.end_headers()
 
-    def read_json(self) -> dict:
+    def read_body(self) -> bytes:
         length = int(self.headers.get("Content-Length", "0"))
         if length <= 0:
+            return b""
+        return self.rfile.read(length)
+
+    def read_json(self) -> dict:
+        body = self.read_body()
+        if not body:
             return {}
         try:
-            return json.loads(self.rfile.read(length).decode("utf-8"))
+            return json.loads(body.decode("utf-8"))
         except json.JSONDecodeError:
             return {}
 
@@ -1018,6 +1177,35 @@ class ApiHandler(BaseHTTPRequestHandler):
             bucket.append(now)
             RATE_LIMIT_BUCKETS[key] = bucket
         return True
+
+    def handle_stripe_webhook(self) -> None:
+        webhook_secret = settings().stripe_webhook_secret
+        if webhook_secret is None:
+            self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Stripe webhook is not configured"})
+            return
+
+        raw_body = self.read_body()
+        signature = self.headers.get("Stripe-Signature", "")
+        if not verify_stripe_signature(raw_body, signature, webhook_secret.get_secret_value()):
+            log_event("stripe_webhook_signature_rejected", ip=self.client_ip())
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid Stripe signature"})
+            return
+
+        try:
+            event = json.loads(raw_body.decode("utf-8"))
+        except json.JSONDecodeError:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": "Invalid Stripe event JSON"})
+            return
+
+        try:
+            with db_cursor(commit=True) as cursor:
+                outcome = process_stripe_event(cursor, event)
+        except ValueError as exc:
+            self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+            return
+
+        log_event("stripe_webhook_processed", event_id=event.get("id"), event_type=event.get("type"), outcome=outcome, ip=self.client_ip())
+        self.send_json(HTTPStatus.OK, {"ok": True, "outcome": outcome})
 
     def current_user(self) -> dict | None:
         token = self.cookie_token()
@@ -1329,6 +1517,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
 
         path = urlparse(self.path).path
+        if path == "/api/stripe/webhook":
+            self.handle_stripe_webhook()
+            return
+
         payload = self.read_json()
 
         if path == "/api/register":

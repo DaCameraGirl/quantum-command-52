@@ -17,6 +17,27 @@ This log records the build history for Repo 52 in plain operational language. It
 
 ## Release Ledger
 
+### Current release - Add Stripe webhook infrastructure
+
+Status: pushed to `main`
+
+Added Stripe webhook infrastructure:
+
+- Optional Pydantic secret field for `STRIPE_WEBHOOK_SECRET`.
+- PostgreSQL table: `billing_accounts`
+- PostgreSQL table: `stripe_webhook_events`
+- Signature verification for `Stripe-Signature` using HMAC-SHA256 and timestamp tolerance.
+- `POST /api/stripe/webhook` route.
+- Idempotent event insert using Stripe event IDs.
+- Billing status/tier updates for checkout, subscription create/update/delete, payment failed, and subscription paused events.
+- `.env.production.example`, Docker Compose, and README now document/pass the Stripe endpoint secret.
+
+Verification:
+
+- `py -3.11 -m py_compile app_config.py server.py seed_transactions.py` passed.
+- Stripe signature helper smoke test passed.
+- `npm run build` passed.
+
 ### Current release - Add strict environment security layer
 
 Status: pushed to `main`

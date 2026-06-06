@@ -89,6 +89,16 @@ RATE_LIMIT_API_PER_MINUTE=120
 
 The backend validates runtime configuration through `web-dashboard/app_config.py` using Pydantic. Database URLs and JWT secrets are stored as secret fields, redacted in normal representation, and rejected early if required values are missing or malformed.
 
+## Stripe Webhooks
+
+Set a Stripe endpoint secret before enabling billing webhooks:
+
+```text
+STRIPE_WEBHOOK_SECRET=whsec_replace_with_stripe_endpoint_secret
+```
+
+The backend exposes `POST /api/stripe/webhook`. It verifies the `Stripe-Signature` header, records every accepted event in `stripe_webhook_events`, and updates `billing_accounts` for checkout, subscription, payment-failed, and subscription-paused events.
+
 Seed the real estate transaction board for registered users:
 
 ```powershell

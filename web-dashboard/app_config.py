@@ -25,6 +25,7 @@ class AppSettings(BaseModel):
     rate_limit_api_per_minute: int = Field(default=120, ge=1, le=3000)
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = Field(default=8787, ge=1, le=65535)
+    stripe_webhook_secret: SecretStr | None = None
 
     @field_validator("database_url")
     @classmethod
@@ -84,6 +85,7 @@ def load_settings_from_env() -> AppSettings:
             rate_limit_api_per_minute=os.environ.get("RATE_LIMIT_API_PER_MINUTE", "120"),
             dashboard_host=os.environ.get("DASHBOARD_HOST", "127.0.0.1"),
             dashboard_port=os.environ.get("DASHBOARD_PORT", "8787"),
+            stripe_webhook_secret=SecretStr(os.environ["STRIPE_WEBHOOK_SECRET"].strip()) if os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip() else None,
         )
     except ValidationError as exc:
         messages = []
