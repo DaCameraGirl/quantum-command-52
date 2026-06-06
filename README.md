@@ -80,7 +80,31 @@ The API now requires PostgreSQL. Set this in the repo `.env` before starting `se
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/quantum_command_52
 DATABASE_POOL_MIN=1
 DATABASE_POOL_MAX=10
+JWT_SECRET=replace-with-at-least-32-random-characters
+ALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+RATE_LIMIT_AUTH_PER_MINUTE=12
+RATE_LIMIT_API_PER_MINUTE=120
 ```
+
+## Docker Deployment
+
+Copy the production example and set strong secrets:
+
+```powershell
+Copy-Item .env.production.example .env.production
+```
+
+Then start the full local stack:
+
+```powershell
+docker compose --env-file .env.production up --build
+```
+
+Services:
+
+- Frontend: `http://127.0.0.1:8080`
+- Backend API: `http://127.0.0.1:8787`
+- PostgreSQL: internal Docker network with persistent `postgres_data` volume
 
 ## How To Use For Real
 

@@ -1,15 +1,25 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  Activity,
+  AlertTriangle,
   ArrowRight,
   BarChart3,
+  Boxes,
+  CheckCircle2,
   CircuitBoard,
+  Database,
+  FileSearch,
+  Gauge,
+  Gem,
+  GraduationCap,
+  Home,
+  Landmark,
   Lock,
   LogOut,
   PieChart,
   ShieldCheck,
   UserPlus,
+  Zap,
 } from "lucide-react";
 import {
   Area,
@@ -18,16 +28,19 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart as RePieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  Pie,
-  PieChart as RePieChart,
 } from "recharts";
 import "./styles.css";
 
-const COLORS = ["#1d4ed8", "#0f766e", "#c2410c", "#7c3aed", "#be123c", "#166534"];
+const COLORS = ["#38bdf8", "#22c55e", "#f97316", "#a78bfa", "#f43f5e", "#facc15"];
+const COMMAND_CAPITAL = 500000;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -67,18 +80,20 @@ function AuthPanel({ onAuth }) {
         <div className="brand-mark">
           <CircuitBoard size={24} />
         </div>
-        <p className="eyebrow">Private telemetry command</p>
-        <h1>Portfolio intelligence, locked per user.</h1>
+        <p className="eyebrow">Data-Analytics command access</p>
+        <h1>Macro Asset Command Center</h1>
         <p className="auth-copy">
-          Sign in to load a personal paper portfolio, chart the allocation matrix, and keep each account separated in SQLite.
+          Secure entry for portfolio telemetry, quantum model outputs, and practical intelligence tools.
         </p>
-        <div className="security-row">
-          <ShieldCheck size={18} />
-          <span>PBKDF2 password hashing</span>
-        </div>
-        <div className="security-row">
-          <Lock size={18} />
-          <span>HttpOnly session cookies</span>
+        <div className="security-grid">
+          <div className="security-row">
+            <ShieldCheck size={18} />
+            <span>JWT authorization</span>
+          </div>
+          <div className="security-row">
+            <Lock size={18} />
+            <span>PostgreSQL identity layer</span>
+          </div>
         </div>
       </section>
 
@@ -113,7 +128,7 @@ function AuthPanel({ onAuth }) {
           </label>
           {error && <div className="error-line">{error}</div>}
           <button className="primary-action" type="submit">
-            {mode === "login" ? "Open dashboard" : "Create account"} <ArrowRight size={18} />
+            {mode === "login" ? "Enter command" : "Create account"} <ArrowRight size={18} />
           </button>
         </form>
       </section>
@@ -121,24 +136,72 @@ function AuthPanel({ onAuth }) {
   );
 }
 
-function Metric({ icon: Icon, label, value, detail }) {
+function HudCard({ icon: Icon, label, value, detail, tone = "blue" }) {
   return (
-    <div className="metric">
-      <div className="metric-icon">
+    <div className={`hud-card ${tone}`}>
+      <div className="hud-icon">
         <Icon size={18} />
       </div>
-      <div>
-        <span>{label}</span>
-        <strong>{value}</strong>
-        <small>{detail}</small>
-      </div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
     </div>
+  );
+}
+
+function StatusPill({ status }) {
+  const normalized = status.toLowerCase();
+  return <span className={`status-pill ${normalized}`}>{status}</span>;
+}
+
+function ToolPanel({ activeTab }) {
+  const content = {
+    macro: {
+      icon: Landmark,
+      title: "Macro Engine",
+      body: "Strict IBM/Qiskit macro pipeline, Alpaca paper-order adapter, and PostgreSQL telemetry store.",
+      command: "py -3.11 strict_macro_quantum_v10.py --preflight",
+    },
+    grants: {
+      icon: GraduationCap,
+      title: "Grants Optimizer",
+      body: "Ranks real grant, scholarship, and emergency-aid opportunities from the local CSV tracker.",
+      command: "python grants.py rank",
+    },
+    housing: {
+      icon: Home,
+      title: "Housing Log",
+      body: "Builds an evidence summary for unresolved housing issues and urgent repair records.",
+      command: "python housing_violations.py summarize",
+    },
+    catalog: {
+      icon: Gem,
+      title: "Item Catalog",
+      body: "Turns comparable sale ranges into a conservative collectible catalog and paper estimate sheet.",
+      command: "python shell_catalog.py estimate",
+    },
+  }[activeTab];
+  const Icon = content.icon;
+
+  return (
+    <section className="tool-panel">
+      <div className="tool-mark">
+        <Icon size={20} />
+      </div>
+      <div>
+        <p className="eyebrow">Operational module</p>
+        <h2>{content.title}</h2>
+        <p>{content.body}</p>
+        <code>{content.command}</code>
+      </div>
+    </section>
   );
 }
 
 function Dashboard({ user, onLogout }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("macro");
 
   useEffect(() => {
     api("/api/portfolio").then(setData).catch((err) => setError(err.message));
@@ -148,122 +211,224 @@ function Dashboard({ user, onLogout }) {
   const summary = data?.summary || {};
   const chartData = useMemo(
     () =>
-      assets.map((asset) => ({
+      assets.map((asset, index) => ({
         ticker: asset.ticker,
         weight: Number(asset.target_weight),
         percent: Number(asset.target_weight) * 100,
+        commandCash: Number(asset.target_weight) * COMMAND_CAPITAL,
         cash: Number(asset.paper_cash),
         risk: Number(asset.volatility) * 100,
         return: Number(asset.expected_return) * 100,
+        fill: COLORS[index % COLORS.length],
       })),
     [assets],
   );
 
+  const riskCurve = useMemo(
+    () =>
+      chartData.map((asset, index) => ({
+        name: asset.ticker,
+        exposure: Number((asset.percent * (1 + index * 0.04)).toFixed(2)),
+        risk: Number(asset.risk.toFixed(2)),
+        return: Number(asset.return.toFixed(2)),
+      })),
+    [chartData],
+  );
+
+  const riskVectors = [
+    { label: "Volatility exposure", value: `${((summary.weightedRisk || 0) * 100).toFixed(2)}%`, status: "Watch" },
+    { label: "Capital concentration", value: `${Math.max(...chartData.map((asset) => asset.percent), 0).toFixed(2)}%`, status: "Pass" },
+    { label: "Broker execution", value: "Paper only", status: "Pass" },
+    { label: "Model drift", value: "CSV seed", status: "Watch" },
+  ];
+
+  const gates = [
+    { gate: "JWT auth boundary", owner: "API", status: "Pass" },
+    { gate: "PostgreSQL pool", owner: "Backend", status: "Ready" },
+    { gate: "Alpaca live trading", owner: "Broker", status: "Blocked" },
+    { gate: "IBM runtime instance", owner: "Quantum", status: "Ready" },
+    { gate: "Rate-limit shield", owner: "Gateway", status: "Pass" },
+  ];
+
   return (
-    <main className="dashboard-shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Quantum portfolio command</p>
-          <h1>{user.displayName}'s telemetry</h1>
+    <main className="command-shell">
+      <aside className="side-rail">
+        <div className="rail-brand">
+          <CircuitBoard size={23} />
         </div>
-        <button className="ghost-button" onClick={onLogout} type="button">
-          <LogOut size={17} /> Sign out
+        <button className={activeTab === "macro" ? "rail-active" : ""} onClick={() => setActiveTab("macro")} title="Macro Engine">
+          <Landmark size={20} />
         </button>
-      </header>
+        <button className={activeTab === "grants" ? "rail-active" : ""} onClick={() => setActiveTab("grants")} title="Grants Optimizer">
+          <GraduationCap size={20} />
+        </button>
+        <button className={activeTab === "housing" ? "rail-active" : ""} onClick={() => setActiveTab("housing")} title="Housing Log">
+          <Home size={20} />
+        </button>
+        <button className={activeTab === "catalog" ? "rail-active" : ""} onClick={() => setActiveTab("catalog")} title="Item Catalog">
+          <Gem size={20} />
+        </button>
+      </aside>
 
-      {error && <div className="error-line">{error}</div>}
-      {!data && !error && <div className="loading-panel">Loading portfolio telemetry...</div>}
+      <section className="command-main">
+        <header className="command-topbar">
+          <div>
+            <p className="eyebrow">Data-Analytics / Repo 52</p>
+            <h1>Macro Asset Command Center</h1>
+          </div>
+          <div className="operator-block">
+            <span>{user.displayName}</span>
+            <button className="ghost-button" onClick={onLogout} type="button">
+              <LogOut size={17} /> Sign out
+            </button>
+          </div>
+        </header>
 
-      {data && (
-        <>
-          <section className="metrics-grid">
-            <Metric icon={Activity} label="Paper capital" value={`$${summary.totalCash.toLocaleString()}`} detail="seeded per user" />
-            <Metric icon={BarChart3} label="Weighted return" value={`${(summary.weightedReturn * 100).toFixed(2)}%`} detail="input model estimate" />
-            <Metric icon={PieChart} label="Weighted risk" value={`${(summary.weightedRisk * 100).toFixed(2)}%`} detail="diagonal risk model" />
-          </section>
+        {error && <div className="error-line">{error}</div>}
+        {!data && !error && <div className="loading-panel">Loading command telemetry...</div>}
 
-          <section className="chart-grid">
-            <div className="chart-panel wide">
-              <div className="panel-heading">
-                <h2>Allocation Matrix</h2>
-                <span>Paper target weights</span>
-              </div>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="ticker" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
-                  <Bar dataKey="percent" radius={[4, 4, 0, 0]}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={entry.ticker} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+        {data && (
+          <>
+            <section className="hud-grid">
+              <HudCard icon={Landmark} label="Command capital" value="$500,000" detail="institutional sandbox boundary" tone="blue" />
+              <HudCard icon={BarChart3} label="Weighted return" value={`${((summary.weightedReturn || 0) * 100).toFixed(2)}%`} detail="model input estimate" tone="green" />
+              <HudCard icon={Gauge} label="Weighted risk" value={`${((summary.weightedRisk || 0) * 100).toFixed(2)}%`} detail="mathematical exposure" tone="orange" />
+              <HudCard icon={Database} label="Telemetry assets" value={summary.assetCount || 0} detail="PostgreSQL portfolio layer" tone="violet" />
+            </section>
 
-            <div className="chart-panel">
-              <div className="panel-heading">
-                <h2>Capital Split</h2>
-                <span>Cash by asset</span>
-              </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <RePieChart>
-                  <Pie data={chartData} dataKey="cash" nameKey="ticker" innerRadius={58} outerRadius={96} paddingAngle={4}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={entry.ticker} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => `$${Number(value).toFixed(2)}`} />
-                </RePieChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="chart-panel">
-              <div className="panel-heading">
-                <h2>Risk / Return</h2>
-                <span>Model inputs</span>
-              </div>
-              <ResponsiveContainer width="100%" height={280}>
-                <AreaChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="ticker" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
-                  <Area dataKey="return" stroke="#0f766e" fill="#99f6e4" fillOpacity={0.55} />
-                  <Area dataKey="risk" stroke="#c2410c" fill="#fed7aa" fillOpacity={0.45} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
-
-          <section className="ledger-panel">
-            <div className="panel-heading">
-              <h2>Per-User Ledger</h2>
-              <span>{summary.assetCount} assets</span>
-            </div>
-            <div className="ledger-table">
-              <div className="ledger-head">
-                <span>Ticker</span>
-                <span>Weight</span>
-                <span>Paper Cash</span>
-                <span>Return</span>
-                <span>Risk</span>
-              </div>
+            <section className="ticker-strip">
               {chartData.map((asset) => (
-                <div className="ledger-row" key={asset.ticker}>
+                <div className="ticker-cell" key={asset.ticker}>
                   <strong>{asset.ticker}</strong>
-                  <span>{asset.percent.toFixed(2)}%</span>
-                  <span>${asset.cash.toFixed(2)}</span>
-                  <span>{asset.return.toFixed(2)}%</span>
-                  <span>{asset.risk.toFixed(2)}%</span>
+                  <span>${asset.commandCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  <small>{asset.percent.toFixed(2)}% target</small>
                 </div>
               ))}
-            </div>
-          </section>
-        </>
-      )}
+            </section>
+
+            <section className="control-grid">
+              <div className="control-panel span-2">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">Risk analysis curve</p>
+                    <h2>Return / Volatility / Exposure</h2>
+                  </div>
+                  <Zap size={18} />
+                </div>
+                <ResponsiveContainer width="100%" height={310}>
+                  <LineChart data={riskCurve}>
+                    <CartesianGrid stroke="#263244" strokeDasharray="3 5" vertical={false} />
+                    <XAxis dataKey="name" stroke="#7c8aa5" />
+                    <YAxis stroke="#7c8aa5" />
+                    <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
+                    <Line type="monotone" dataKey="return" stroke="#22c55e" strokeWidth={3} dot={false} />
+                    <Line type="monotone" dataKey="risk" stroke="#f97316" strokeWidth={3} dot={false} />
+                    <Line type="monotone" dataKey="exposure" stroke="#38bdf8" strokeWidth={3} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="control-panel">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">Allocation wheel</p>
+                    <h2>Capital Distribution</h2>
+                  </div>
+                  <PieChart size={18} />
+                </div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <RePieChart>
+                    <Pie data={chartData} dataKey="commandCash" nameKey="ticker" innerRadius={58} outerRadius={100} paddingAngle={4}>
+                      {chartData.map((entry) => (
+                        <Cell key={entry.ticker} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} formatter={(value) => `$${Number(value).toFixed(2)}`} />
+                  </RePieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="control-panel">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">Deployment risk vectors</p>
+                    <h2>System Change Posture</h2>
+                  </div>
+                  <AlertTriangle size={18} />
+                </div>
+                <div className="vector-stack">
+                  {riskVectors.map((vector) => (
+                    <div className="vector-row" key={vector.label}>
+                      <span>{vector.label}</span>
+                      <strong>{vector.value}</strong>
+                      <StatusPill status={vector.status} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="control-panel span-2">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">Policy compliance gate ledger</p>
+                    <h2>Production Readiness Gates</h2>
+                  </div>
+                  <ShieldCheck size={18} />
+                </div>
+                <div className="gate-table">
+                  {gates.map((gate) => (
+                    <div className="gate-row" key={gate.gate}>
+                      <CheckCircle2 size={17} />
+                      <span>{gate.gate}</span>
+                      <small>{gate.owner}</small>
+                      <StatusPill status={gate.status} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="control-panel">
+                <div className="panel-heading">
+                  <div>
+                    <p className="eyebrow">Capital grid</p>
+                    <h2>Asset Ledger</h2>
+                  </div>
+                  <Boxes size={18} />
+                </div>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={chartData}>
+                    <CartesianGrid stroke="#263244" strokeDasharray="3 5" vertical={false} />
+                    <XAxis dataKey="ticker" stroke="#7c8aa5" />
+                    <YAxis stroke="#7c8aa5" />
+                    <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
+                    <Bar dataKey="percent" radius={[4, 4, 0, 0]}>
+                      {chartData.map((entry) => (
+                        <Cell key={entry.ticker} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+
+            <section className="module-tabs">
+              <button className={activeTab === "macro" ? "active" : ""} onClick={() => setActiveTab("macro")} type="button">
+                <Landmark size={17} /> Macro
+              </button>
+              <button className={activeTab === "grants" ? "active" : ""} onClick={() => setActiveTab("grants")} type="button">
+                <GraduationCap size={17} /> Grants
+              </button>
+              <button className={activeTab === "housing" ? "active" : ""} onClick={() => setActiveTab("housing")} type="button">
+                <Home size={17} /> Housing
+              </button>
+              <button className={activeTab === "catalog" ? "active" : ""} onClick={() => setActiveTab("catalog")} type="button">
+                <FileSearch size={17} /> Catalog
+              </button>
+            </section>
+            <ToolPanel activeTab={activeTab} />
+          </>
+        )}
+      </section>
     </main>
   );
 }

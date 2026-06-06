@@ -6,6 +6,8 @@ import hmac
 import json
 import os
 import secrets
+import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
@@ -14,6 +16,7 @@ from pathlib import Path
 from typing import Iterator
 from urllib.parse import urlparse
 
+import jwt
 from psycopg2 import errors
 from psycopg2.extras import RealDictCursor, execute_values
 from psycopg2.pool import ThreadedConnectionPool
@@ -31,10 +34,21 @@ DEFAULT_ASSETS = [
 ]
 
 POOL: ThreadedConnectionPool | None = None
+RATE_LIMIT_LOCK = threading.Lock()
+RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def log_event(event: str, **fields) -> None:
+    payload = {
+        "ts": utc_now().isoformat(),
+        "event": event,
+        **fields,
+    }
+    print(json.dumps(payload, default=str), flush=True)
 
 
 def load_dotenv_file() -> None:
@@ -48,11 +62,38 @@ def load_dotenv_file() -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def database_url() -> str:
-    value = os.environ.get("DATABASE_URL", "").strip()
+def required_env(name: str) -> str:
+    value = os.environ.get(name, "").strip()
     if not value:
-        raise RuntimeError("DATABASE_URL is required for the PostgreSQL dashboard API.")
+        raise RuntimeError(f"{name} is required.")
     return value
+
+
+def database_url() -> str:
+    return required_env("DATABASE_URL")
+
+
+def jwt_secret() -> str:
+    value = required_env("JWT_SECRET")
+    if len(value) < 32:
+        raise RuntimeError("JWT_SECRET must be at least 32 characters.")
+    return value
+
+
+def allowed_origins() -> set[str]:
+    configured = os.environ.get(
+        "ALLOWED_ORIGINS",
+        "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:8080,http://localhost:8080",
+    )
+    return {origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()}
+
+
+def cookie_secure() -> bool:
+    return os.environ.get("COOKIE_SECURE", "false").strip().lower() in {"1", "true", "yes"}
+
+
+def access_token_max_age() -> int:
+    return int(os.environ.get("JWT_TTL_SECONDS", "1209600"))
 
 
 def init_pool() -> None:
@@ -166,6 +207,38 @@ def verify_password(password: str, stored_hash: str) -> bool:
     return hmac.compare_digest(digest.hex(), expected)
 
 
+def create_jwt(user: dict) -> str:
+    now = utc_now()
+    expires_at = now + timedelta(seconds=access_token_max_age())
+    return jwt.encode(
+        {
+            "sub": str(user["id"]),
+            "email": user["email"],
+            "iat": int(now.timestamp()),
+            "exp": int(expires_at.timestamp()),
+        },
+        jwt_secret(),
+        algorithm="HS256",
+    )
+
+
+def decode_jwt(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, jwt_secret(), algorithms=["HS256"])
+    except jwt.PyJWTError:
+        return None
+
+
+def access_cookie_header(token: str) -> str:
+    secure = "; Secure" if cookie_secure() else ""
+    return f"access_token={token}; Path=/; Max-Age={access_token_max_age()}; HttpOnly; SameSite=Lax{secure}"
+
+
+def clear_cookie_header() -> str:
+    secure = "; Secure" if cookie_secure() else ""
+    return f"access_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{secure}"
+
+
 def load_seed_assets() -> list[tuple[str, str, float, float, float, float]]:
     if not SEED_CSV.exists():
         return DEFAULT_ASSETS
@@ -267,15 +340,53 @@ class ApiHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:
         return
 
+    def client_ip(self) -> str:
+        forwarded = self.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            return forwarded.split(",", 1)[0].strip()
+        return self.client_address[0]
+
+    def cors_headers(self) -> dict[str, str]:
+        origin = self.headers.get("Origin", "").rstrip("/")
+        if origin and origin not in allowed_origins():
+            return {}
+        headers = {
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Max-Age": "600",
+        }
+        if origin:
+            headers["Access-Control-Allow-Origin"] = origin
+        return headers
+
     def send_json(self, status: int, payload: dict, headers: dict[str, str] | None = None) -> None:
         body = json.dumps(payload, default=str).encode("utf-8")
+        merged_headers = {**self.cors_headers(), **(headers or {})}
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        for key, value in (headers or {}).items():
+        for key, value in merged_headers.items():
             self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
+        log_event(
+            "api_response",
+            method=self.command,
+            path=urlparse(self.path).path,
+            status=int(status),
+            ip=self.client_ip(),
+        )
+
+    def do_OPTIONS(self) -> None:
+        origin = self.headers.get("Origin", "").rstrip("/")
+        if origin and origin not in allowed_origins():
+            self.send_json(HTTPStatus.FORBIDDEN, {"error": "Origin not allowed"})
+            return
+        self.send_response(HTTPStatus.NO_CONTENT)
+        for key, value in self.cors_headers().items():
+            self.send_header(key, value)
+        self.end_headers()
 
     def read_json(self) -> dict:
         length = int(self.headers.get("Content-Length", "0"))
@@ -290,23 +401,44 @@ class ApiHandler(BaseHTTPRequestHandler):
         raw = self.headers.get("Cookie", "")
         for part in raw.split(";"):
             key, _, value = part.strip().partition("=")
-            if key == "session_id" and value:
+            if key == "access_token" and value:
                 return value
+        auth = self.headers.get("Authorization", "")
+        prefix = "Bearer "
+        if auth.startswith(prefix):
+            return auth[len(prefix) :].strip()
         return None
+
+    def rate_limit(self) -> bool:
+        path = urlparse(self.path).path
+        if path == "/api/health":
+            return True
+        is_auth = path in {"/api/login", "/api/register"}
+        limit = int(os.environ.get("RATE_LIMIT_AUTH_PER_MINUTE" if is_auth else "RATE_LIMIT_API_PER_MINUTE", "12" if is_auth else "120"))
+        now = time.time()
+        window_start = now - 60
+        key = f"{self.client_ip()}:{path}"
+        with RATE_LIMIT_LOCK:
+            bucket = [stamp for stamp in RATE_LIMIT_BUCKETS.get(key, []) if stamp >= window_start]
+            if len(bucket) >= limit:
+                RATE_LIMIT_BUCKETS[key] = bucket
+                log_event("rate_limit_block", path=path, ip=self.client_ip(), limit=limit)
+                return False
+            bucket.append(now)
+            RATE_LIMIT_BUCKETS[key] = bucket
+        return True
 
     def current_user(self) -> dict | None:
         token = self.cookie_token()
         if not token:
             return None
+        claims = decode_jwt(token)
+        if not claims:
+            return None
         with db_cursor() as cursor:
             cursor.execute(
-                """
-                SELECT user_profiles.*
-                FROM user_sessions
-                JOIN user_profiles ON user_profiles.id = user_sessions.user_id
-                WHERE user_sessions.token = %s AND user_sessions.expires_at > %s
-                """,
-                (token, utc_now()),
+                "SELECT * FROM user_profiles WHERE id = %s AND email = %s",
+                (claims.get("sub"), claims.get("email")),
             )
             return cursor.fetchone()
 
@@ -317,9 +449,13 @@ class ApiHandler(BaseHTTPRequestHandler):
         return user
 
     def do_GET(self) -> None:
+        if not self.rate_limit():
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
+            return
+
         path = urlparse(self.path).path
         if path == "/api/health":
-            self.send_json(HTTPStatus.OK, {"ok": True, "database": "postgresql"})
+            self.send_json(HTTPStatus.OK, {"ok": True, "database": "postgresql", "auth": "jwt"})
             return
 
         if path == "/api/me":
@@ -371,6 +507,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 )
                 telemetry = cursor.fetchall()
 
+            log_event("portfolio_payload", user_id=user["id"], asset_count=len(assets), ip=self.client_ip())
             self.send_json(
                 HTTPStatus.OK,
                 {
@@ -385,6 +522,10 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_POST(self) -> None:
+        if not self.rate_limit():
+            self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
+            return
+
         path = urlparse(self.path).path
         payload = self.read_json()
 
@@ -401,16 +542,17 @@ class ApiHandler(BaseHTTPRequestHandler):
                         """
                         INSERT INTO user_profiles (email, display_name, password_hash)
                         VALUES (%s, %s, %s)
-                        RETURNING id
+                        RETURNING id, email, display_name
                         """,
                         (email, display_name, hash_password(password)),
                     )
-                    user_id = int(cursor.fetchone()["id"])
-                    seed_user_assets(cursor, user_id)
+                    user = cursor.fetchone()
+                    seed_user_assets(cursor, int(user["id"]))
             except errors.UniqueViolation:
                 self.send_json(HTTPStatus.CONFLICT, {"error": "That email is already registered."})
                 return
-            self.create_session(email)
+            log_event("user_registered", user_id=user["id"], email=email, ip=self.client_ip())
+            self.create_session(user)
             return
 
         if path == "/api/login":
@@ -420,45 +562,36 @@ class ApiHandler(BaseHTTPRequestHandler):
                 cursor.execute("SELECT * FROM user_profiles WHERE email = %s", (email,))
                 user = cursor.fetchone()
             if not user or not verify_password(password, user["password_hash"]):
+                log_event("login_failed", email=email, ip=self.client_ip())
                 self.send_json(HTTPStatus.UNAUTHORIZED, {"error": "Invalid email or password."})
                 return
-            self.create_session(email)
+            log_event("login_success", user_id=user["id"], email=email, ip=self.client_ip())
+            self.create_session(user)
             return
 
         if path == "/api/logout":
-            token = self.cookie_token()
-            if token:
-                with db_cursor(commit=True) as cursor:
-                    cursor.execute("DELETE FROM user_sessions WHERE token = %s", (token,))
-            self.send_json(HTTPStatus.OK, {"ok": True}, {"Set-Cookie": "session_id=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"})
+            self.send_json(HTTPStatus.OK, {"ok": True}, {"Set-Cookie": clear_cookie_header()})
             return
 
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
-    def create_session(self, email: str) -> None:
-        token = secrets.token_urlsafe(32)
-        expires_at = utc_now() + timedelta(days=14)
-        with db_cursor(commit=True) as cursor:
-            cursor.execute("SELECT * FROM user_profiles WHERE email = %s", (email,))
-            user = cursor.fetchone()
-            cursor.execute(
-                "INSERT INTO user_sessions (token, user_id, expires_at) VALUES (%s, %s, %s)",
-                (token, user["id"], expires_at),
-            )
+    def create_session(self, user: dict) -> None:
+        token = create_jwt(user)
         self.send_json(
             HTTPStatus.OK,
             {"user": {"email": user["email"], "displayName": user["display_name"]}},
-            {"Set-Cookie": f"session_id={token}; Path=/; Max-Age=1209600; HttpOnly; SameSite=Lax"},
+            {"Set-Cookie": access_cookie_header(token)},
         )
 
 
 def main() -> None:
     load_dotenv_file()
+    jwt_secret()
     init_pool()
     init_db()
     host = os.environ.get("DASHBOARD_HOST", "127.0.0.1")
     port = int(os.environ.get("DASHBOARD_PORT", "8787"))
-    print(f"Dashboard API listening on http://{host}:{port} using PostgreSQL")
+    log_event("api_started", host=host, port=port, database="postgresql", auth="jwt")
     ThreadingHTTPServer((host, port), ApiHandler).serve_forever()
 
 

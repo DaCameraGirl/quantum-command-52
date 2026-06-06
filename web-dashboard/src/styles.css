@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  color: #111827;
-  background: #eef2f3;
-  font-family: Cambria, "Georgia", serif;
+  color: #d9e7f7;
+  background: #070b12;
+  font-family: "Bahnschrift", "Aptos", "Trebuchet MS", sans-serif;
   font-synthesis: none;
   text-rendering: geometricPrecision;
 }
@@ -17,9 +17,9 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    linear-gradient(135deg, rgba(15, 118, 110, 0.10), transparent 32%),
-    linear-gradient(315deg, rgba(194, 65, 12, 0.09), transparent 34%),
-    #eef2f3;
+    linear-gradient(135deg, rgba(56, 189, 248, 0.10), transparent 30%),
+    linear-gradient(315deg, rgba(249, 115, 22, 0.08), transparent 34%),
+    #070b12;
 }
 
 button,
@@ -31,18 +31,14 @@ button {
   cursor: pointer;
 }
 
-.auth-shell,
-.dashboard-shell {
-  width: min(1180px, calc(100vw - 32px));
-  margin: 0 auto;
-}
-
 .auth-shell {
+  width: min(1180px, calc(100vw - 32px));
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 420px;
   gap: 32px;
   align-items: center;
+  margin: 0 auto;
 }
 
 .auth-aside {
@@ -50,22 +46,28 @@ button {
 }
 
 .brand-mark,
-.metric-icon {
+.rail-brand,
+.hud-icon,
+.tool-mark {
   display: inline-grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  border: 1px solid rgba(56, 189, 248, 0.34);
   border-radius: 8px;
-  background: #111827;
-  color: #f8fafc;
-  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.24);
+  background: linear-gradient(145deg, #132033, #08111f);
+  color: #38bdf8;
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
+}
+
+.brand-mark,
+.rail-brand {
+  width: 46px;
+  height: 46px;
 }
 
 .eyebrow {
-  margin: 18px 0 8px;
-  color: #0f766e;
-  font-family: "Trebuchet MS", sans-serif;
-  font-size: 0.78rem;
+  margin: 0 0 8px;
+  color: #38bdf8;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -78,65 +80,87 @@ p {
 }
 
 h1 {
-  max-width: 760px;
-  margin-bottom: 18px;
-  color: #111827;
-  font-size: clamp(2.5rem, 5vw, 5.5rem);
-  line-height: 0.94;
+  max-width: 820px;
+  margin-bottom: 14px;
+  color: #f8fbff;
+  font-size: clamp(2.35rem, 5vw, 5.2rem);
+  line-height: 0.96;
   letter-spacing: 0;
 }
 
 h2 {
   margin-bottom: 0;
-  color: #111827;
-  font-size: 1.15rem;
+  color: #f8fbff;
+  font-size: 1.05rem;
 }
 
-.auth-copy {
-  max-width: 620px;
-  color: #334155;
-  font-size: 1.12rem;
+.auth-copy,
+.tool-panel p {
+  max-width: 640px;
+  color: #9fb2ca;
+  font-size: 1.05rem;
   line-height: 1.65;
+}
+
+.security-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .security-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 14px;
-  color: #1f2937;
-  font-family: "Trebuchet MS", sans-serif;
-  font-weight: 700;
+  min-height: 42px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #d9e7f7;
+  font-weight: 800;
 }
 
 .auth-panel,
-.chart-panel,
-.ledger-panel,
-.metric,
+.control-panel,
+.hud-card,
+.tool-panel,
 .loading-panel {
-  border: 1px solid rgba(17, 24, 39, 0.10);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(14px);
+  background: rgba(9, 15, 27, 0.82);
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
 }
 
 .auth-panel {
   padding: 24px;
 }
 
-.segmented {
+.segmented,
+.module-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 6px;
-  padding: 4px;
+  padding: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 8px;
-  background: #dbe5e6;
+  background: #0b1220;
+}
+
+.segmented {
+  grid-template-columns: 1fr 1fr;
+}
+
+.module-tabs {
+  grid-template-columns: repeat(4, 1fr);
+  margin: 14px 0;
 }
 
 .segmented button,
+.module-tabs button,
 .ghost-button,
-.primary-action {
+.primary-action,
+.side-rail button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -144,19 +168,22 @@ h2 {
   min-height: 42px;
   border: 0;
   border-radius: 7px;
-  font-family: "Trebuchet MS", sans-serif;
   font-weight: 800;
 }
 
-.segmented button {
+.segmented button,
+.module-tabs button,
+.side-rail button {
   background: transparent;
-  color: #475569;
+  color: #7c8aa5;
 }
 
-.segmented .active {
-  background: #ffffff;
-  color: #111827;
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.10);
+.segmented .active,
+.module-tabs .active,
+.side-rail .rail-active {
+  background: #132033;
+  color: #f8fbff;
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.30);
 }
 
 form {
@@ -168,157 +195,292 @@ form {
 label {
   display: grid;
   gap: 8px;
-  color: #334155;
-  font-family: "Trebuchet MS", sans-serif;
-  font-size: 0.9rem;
+  color: #aebfd4;
+  font-size: 0.86rem;
   font-weight: 800;
 }
 
 input {
   width: 100%;
   min-height: 46px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #263244;
   border-radius: 7px;
   padding: 0 12px;
-  background: #f8fafc;
-  color: #111827;
+  background: #050a12;
+  color: #f8fbff;
   outline: none;
 }
 
 input:focus {
-  border-color: #0f766e;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.16);
 }
 
 .primary-action {
-  background: #111827;
-  color: #f8fafc;
+  background: #38bdf8;
+  color: #06111f;
 }
 
 .ghost-button {
   padding: 0 14px;
-  background: #ffffff;
-  color: #111827;
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: #101827;
+  color: #d9e7f7;
+  border: 1px solid rgba(148, 163, 184, 0.18);
 }
 
 .error-line {
+  border: 1px solid rgba(244, 63, 94, 0.34);
   border-radius: 7px;
   padding: 10px 12px;
-  background: #fff1f2;
-  color: #be123c;
-  font-family: "Trebuchet MS", sans-serif;
+  background: rgba(127, 29, 29, 0.32);
+  color: #fecdd3;
   font-weight: 800;
 }
 
-.dashboard-shell {
-  padding: 30px 0 48px;
+.command-shell {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  min-height: 100vh;
 }
 
-.topbar {
+.side-rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: grid;
+  grid-template-rows: 74px repeat(4, 54px) 1fr;
+  gap: 10px;
+  justify-items: center;
+  padding: 18px 10px;
+  border-right: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(5, 10, 18, 0.88);
+}
+
+.side-rail button {
+  width: 46px;
+  min-height: 46px;
+}
+
+.command-main {
+  width: min(1440px, calc(100vw - 108px));
+  margin: 0 auto;
+  padding: 24px 0 42px;
+}
+
+.command-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 
-.topbar h1 {
+.command-topbar h1 {
   margin-bottom: 0;
-  font-size: clamp(2rem, 4vw, 4.2rem);
+  font-size: clamp(2rem, 4vw, 4rem);
 }
 
-.metrics-grid {
+.operator-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #9fb2ca;
+  font-weight: 800;
+}
+
+.hud-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hud-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 148px;
+  padding: 16px;
+}
+
+.hud-card::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 3px;
+  background: #38bdf8;
+}
+
+.hud-card.green::after {
+  background: #22c55e;
+}
+
+.hud-card.orange::after {
+  background: #f97316;
+}
+
+.hud-card.violet::after {
+  background: #a78bfa;
+}
+
+.hud-icon {
+  width: 34px;
+  height: 34px;
   margin-bottom: 14px;
 }
 
-.metric {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding: 18px;
-}
-
-.metric span,
-.metric small,
-.panel-heading span {
+.hud-card span,
+.hud-card small,
+.panel-heading span,
+.ticker-cell small {
   display: block;
-  color: #64748b;
-  font-family: "Trebuchet MS", sans-serif;
-  font-size: 0.78rem;
+  color: #7c8aa5;
+  font-size: 0.74rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
-.metric strong {
+.hud-card strong {
   display: block;
-  margin: 2px 0;
-  color: #111827;
-  font-size: 1.55rem;
+  margin: 4px 0 6px;
+  color: #f8fbff;
+  font-size: 1.75rem;
 }
 
-.chart-grid {
+.ticker-strip {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.chart-panel,
-.ledger-panel {
-  padding: 18px;
+.ticker-cell {
+  min-height: 74px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  padding: 12px;
+  background: linear-gradient(180deg, #101827, #080e19);
+}
+
+.ticker-cell strong {
+  display: block;
+  color: #38bdf8;
+}
+
+.ticker-cell span {
+  display: block;
+  margin: 4px 0;
+  color: #f8fbff;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr 0.85fr;
+  gap: 12px;
+}
+
+.control-panel {
   min-width: 0;
+  padding: 16px;
 }
 
-.chart-panel.wide {
-  grid-column: 1 / -1;
+.span-2 {
+  grid-column: span 2;
 }
 
 .panel-heading {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: #38bdf8;
 }
 
-.ledger-panel {
-  margin-top: 14px;
-}
-
-.ledger-table {
+.vector-stack,
+.gate-table {
   display: grid;
-  gap: 6px;
-  font-family: "Trebuchet MS", sans-serif;
+  gap: 8px;
 }
 
-.ledger-head,
-.ledger-row {
+.vector-row,
+.gate-row {
   display: grid;
-  grid-template-columns: 1.2fr repeat(4, 1fr);
+  grid-template-columns: 1fr auto auto;
   gap: 10px;
   align-items: center;
-  min-height: 42px;
+  min-height: 46px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
   padding: 0 10px;
+  background: #0b1220;
 }
 
-.ledger-head {
-  color: #64748b;
-  font-size: 0.75rem;
+.gate-row {
+  grid-template-columns: 22px 1fr 90px auto;
+}
+
+.vector-row span,
+.gate-row span {
+  color: #d9e7f7;
   font-weight: 800;
+}
+
+.vector-row strong,
+.gate-row small {
+  color: #9fb2ca;
+}
+
+.status-pill {
+  min-width: 64px;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #7dd3fc;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-align: center;
   text-transform: uppercase;
 }
 
-.ledger-row {
-  border-radius: 7px;
-  background: #f8fafc;
-  color: #334155;
+.status-pill.pass,
+.status-pill.ready {
+  background: rgba(34, 197, 94, 0.13);
+  color: #86efac;
 }
 
-.ledger-row strong {
-  color: #111827;
+.status-pill.watch {
+  background: rgba(249, 115, 22, 0.14);
+  color: #fdba74;
+}
+
+.status-pill.blocked {
+  background: rgba(244, 63, 94, 0.15);
+  color: #fda4af;
+}
+
+.tool-panel {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 14px;
+  padding: 18px;
+}
+
+.tool-mark {
+  width: 42px;
+  height: 42px;
+}
+
+.tool-panel code {
+  display: inline-block;
+  max-width: 100%;
+  border: 1px solid rgba(56, 189, 248, 0.24);
+  border-radius: 7px;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+  background: #050a12;
+  color: #7dd3fc;
 }
 
 .loading-panel {
@@ -326,8 +488,7 @@ input:focus {
   place-items: center;
   min-height: 180px;
   padding: 24px;
-  color: #334155;
-  font-family: "Trebuchet MS", sans-serif;
+  color: #9fb2ca;
   font-weight: 800;
 }
 
@@ -335,29 +496,62 @@ input:focus {
   min-height: 100vh;
 }
 
-@media (max-width: 860px) {
-  .auth-shell,
-  .metrics-grid,
-  .chart-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 1180px) {
+  .hud-grid,
+  .ticker-strip,
+  .control-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
+  .span-2 {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 820px) {
   .auth-shell {
+    grid-template-columns: 1fr;
     align-items: start;
     padding: 28px 0;
   }
 
-  .topbar {
+  .command-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .side-rail {
+    position: static;
+    height: auto;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: none;
+    border-right: 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  .command-main {
+    width: min(100vw - 24px, 720px);
+  }
+
+  .command-topbar,
+  .operator-block {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .ledger-head {
-    display: none;
+  .hud-grid,
+  .ticker-strip,
+  .control-grid,
+  .module-tabs {
+    grid-template-columns: 1fr;
   }
 
-  .ledger-row {
-    grid-template-columns: 1fr 1fr;
+  .span-2 {
+    grid-column: auto;
+  }
+
+  .gate-row,
+  .vector-row {
+    grid-template-columns: 1fr;
     padding: 12px;
   }
 }
