@@ -18,6 +18,7 @@ import {
   LogOut,
   PieChart,
   Plus,
+  Printer,
   RefreshCw,
   ShieldCheck,
   Trash2,
@@ -366,9 +367,234 @@ function GrantOptimizer() {
   );
 }
 
+function HousingEvidenceVault() {
+  const [incidents, setIncidents] = useState([]);
+  const [summary, setSummary] = useState({ incidentCount: 0, openIncidentCount: 0, overdueCount: 0, maxDaysUnresolved: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    category: "Maintenance",
+    description: "",
+    areaLocation: "",
+    requestDate: new Date().toISOString().slice(0, 10),
+    resolveDate: "",
+    severityLevel: "5",
+    status: "open",
+  });
+
+  async function loadIncidents() {
+    setError("");
+    setLoading(true);
+    try {
+      const payload = await api("/api/housing");
+      setIncidents(payload.incidents || []);
+      setSummary(payload.summary || {});
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadIncidents();
+  }, []);
+
+  async function submitIncident(event) {
+    event.preventDefault();
+    setError("");
+    try {
+      await api("/api/housing", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          severityLevel: Number(form.severityLevel),
+        }),
+      });
+      setForm({
+        category: "Maintenance",
+        description: "",
+        areaLocation: "",
+        requestDate: new Date().toISOString().slice(0, 10),
+        resolveDate: "",
+        severityLevel: "5",
+        status: "open",
+      });
+      await loadIncidents();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function updateIncident(incident, patch) {
+    setError("");
+    try {
+      await api(`/api/housing/${incident.incident_id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          category: incident.category,
+          description: incident.description,
+          areaLocation: incident.area_location,
+          requestDate: incident.request_date,
+          resolveDate: incident.resolve_date || "",
+          severityLevel: Number(incident.severity_level),
+          status: incident.status,
+          ...patch,
+        }),
+      });
+      await loadIncidents();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deleteIncident(incidentId) {
+    setError("");
+    try {
+      await api(`/api/housing/${incidentId}`, { method: "DELETE" });
+      await loadIncidents();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <section className="housing-vault">
+      <div className="grant-head">
+        <div>
+          <p className="eyebrow">Evidence vault</p>
+          <h2>Housing Incident Timeline</h2>
+          <p>Authenticated incident tracking with days-unresolved calculations and severity-based violation flags.</p>
+        </div>
+        <div className="vault-actions">
+          <button className="ghost-button" onClick={loadIncidents} type="button">
+            <RefreshCw size={16} /> Refresh
+          </button>
+          <button className="ghost-button print-button" onClick={() => window.print()} type="button">
+            <Printer size={16} /> Print
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="error-line">{error}</div>}
+
+      <div className="grant-summary-grid">
+        <HudCard icon={Home} label="Logged incidents" value={summary.incidentCount || 0} detail="evidence records" tone="blue" />
+        <HudCard icon={AlertTriangle} label="Open issues" value={summary.openIncidentCount || 0} detail="not resolved or closed" tone="orange" />
+        <HudCard icon={ShieldCheck} label="Overdue flags" value={summary.overdueCount || 0} detail="timeline alerts" tone="violet" />
+        <HudCard icon={Gauge} label="Max unresolved" value={`${summary.maxDaysUnresolved || 0}d`} detail="open timeline" tone="green" />
+      </div>
+
+      <form className="housing-form" onSubmit={submitIncident}>
+        <label>
+          Category
+          <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+            <option>Maintenance</option>
+            <option>Safety</option>
+            <option>Utilities</option>
+            <option>Pest</option>
+            <option>Access</option>
+            <option>Lease</option>
+          </select>
+        </label>
+        <label>
+          Area / location
+          <input value={form.areaLocation} onChange={(event) => setForm({ ...form, areaLocation: event.target.value })} placeholder="Kitchen ceiling" />
+        </label>
+        <label>
+          Request date
+          <input value={form.requestDate} onChange={(event) => setForm({ ...form, requestDate: event.target.value })} type="date" />
+        </label>
+        <label>
+          Severity
+          <select value={form.severityLevel} onChange={(event) => setForm({ ...form, severityLevel: event.target.value })}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => (
+              <option key={value} value={value}>{value}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Status
+          <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+            <option value="open">Open</option>
+            <option value="requested">Requested</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="escalated">Escalated</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+        <label className="housing-description">
+          Description
+          <input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Document what happened, who was notified, and visible impact" />
+        </label>
+        <button className="primary-action" type="submit">
+          <Plus size={17} /> Add incident
+        </button>
+      </form>
+
+      <div className="timeline-deck">
+        {loading && <div className="grant-empty">Loading housing timeline...</div>}
+        {!loading && incidents.length === 0 && <div className="grant-empty">No incidents logged yet. Add the first record above.</div>}
+        {!loading &&
+          incidents.map((incident) => (
+            <article className={`timeline-card ${incident.violation_flag}`} key={incident.incident_id}>
+              <div className="timeline-main">
+                <div>
+                  <p className="eyebrow">{incident.category} / {incident.area_location}</p>
+                  <h3>{incident.description}</h3>
+                </div>
+                <div className="days-counter">
+                  <strong>{incident.days_unresolved}</strong>
+                  <span>days</span>
+                </div>
+              </div>
+              <div className="timeline-meta">
+                <span>Requested {incident.request_date}</span>
+                <span>{incident.resolve_date ? `Resolved ${incident.resolve_date}` : "Resolution pending"}</span>
+                <StatusPill status={incident.violation_flag.replaceAll("_", " ")} />
+              </div>
+              <div className="timeline-controls">
+                <label>
+                  Severity
+                  <select
+                    value={String(incident.severity_level)}
+                    onChange={(event) => updateIncident(incident, { severityLevel: Number(event.target.value) })}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => (
+                      <option key={value} value={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Status
+                  <select value={incident.status} onChange={(event) => updateIncident(incident, { status: event.target.value })}>
+                    <option value="open">Open</option>
+                    <option value="requested">Requested</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="escalated">Escalated</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </label>
+                <button className="icon-button danger" onClick={() => deleteIncident(incident.incident_id)} type="button" aria-label={`Delete incident ${incident.incident_id}`}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </article>
+          ))}
+      </div>
+    </section>
+  );
+}
+
 function ToolPanel({ activeTab }) {
   if (activeTab === "grants") {
     return <GrantOptimizer />;
+  }
+
+  if (activeTab === "housing") {
+    return <HousingEvidenceVault />;
   }
 
   const content = {
@@ -377,12 +603,6 @@ function ToolPanel({ activeTab }) {
       title: "Macro Engine",
       body: "Strict IBM/Qiskit macro pipeline, Alpaca paper-order adapter, and PostgreSQL telemetry store.",
       command: "py -3.11 strict_macro_quantum_v10.py --preflight",
-    },
-    housing: {
-      icon: Home,
-      title: "Housing Log",
-      body: "Builds an evidence summary for unresolved housing issues and urgent repair records.",
-      command: "python housing_violations.py summarize",
     },
     catalog: {
       icon: Gem,

@@ -191,6 +191,20 @@ def init_db() -> None:
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
             );
 
+            CREATE TABLE IF NOT EXISTS housing_incidents (
+                incident_id BIGSERIAL PRIMARY KEY,
+                user_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
+                category TEXT NOT NULL,
+                description TEXT NOT NULL,
+                area_location TEXT NOT NULL,
+                request_date DATE NOT NULL,
+                resolve_date DATE,
+                severity_level INTEGER NOT NULL CHECK (severity_level BETWEEN 1 AND 10),
+                status TEXT NOT NULL DEFAULT 'open',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+
             CREATE INDEX IF NOT EXISTS idx_sessions_user_expires
                 ON user_sessions(user_id, expires_at);
             CREATE INDEX IF NOT EXISTS idx_assets_user_weight
@@ -203,6 +217,10 @@ def init_db() -> None:
                 ON grant_ledger(user_id, priority_score DESC, deadline ASC NULLS LAST);
             CREATE INDEX IF NOT EXISTS idx_grants_user_status
                 ON grant_ledger(user_id, status);
+            CREATE INDEX IF NOT EXISTS idx_housing_user_status_request
+                ON housing_incidents(user_id, status, request_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_housing_user_severity
+                ON housing_incidents(user_id, severity_level DESC, request_date DESC);
             """
         )
 
@@ -345,6 +363,87 @@ def grant_payload(payload: dict) -> dict:
         "application_difficulty": difficulty,
         "priority_score": priority_score,
         "status": status,
+    }
+
+
+def clean_housing_status(value: str) -> str:
+    allowed = {"open", "requested", "scheduled", "resolved", "closed", "escalated"}
+    normalized = str(value or "open").strip().lower().replace(" ", "_").replace("-", "_")
+    return normalized if normalized in allowed else "open"
+
+
+def housing_payload(payload: dict) -> dict:
+    category = str(payload.get("category", "")).strip()
+    description = str(payload.get("description", "")).strip()
+    area_location = str(payload.get("areaLocation") or payload.get("area_location") or "").strip()
+    if not category:
+        raise ValueError("category is required")
+    if not description:
+        raise ValueError("description is required")
+    if not area_location:
+        raise ValueError("areaLocation is required")
+
+    request_date = parse_deadline(payload.get("requestDate") or payload.get("request_date"))
+    if request_date is None:
+        raise ValueError("requestDate is required")
+    resolve_date = parse_deadline(payload.get("resolveDate") or payload.get("resolve_date"))
+    if resolve_date and resolve_date < request_date:
+        raise ValueError("resolveDate cannot be before requestDate")
+
+    try:
+        severity = int(payload.get("severityLevel", payload.get("severity_level", 5)))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("severityLevel must be an integer from 1 to 10") from exc
+    if not 1 <= severity <= 10:
+        raise ValueError("severityLevel must be between 1 and 10")
+
+    status = clean_housing_status(payload.get("status", "open"))
+    if resolve_date and status not in {"resolved", "closed"}:
+        status = "resolved"
+    return {
+        "category": category,
+        "description": description,
+        "area_location": area_location,
+        "request_date": request_date,
+        "resolve_date": resolve_date,
+        "severity_level": severity,
+        "status": status,
+    }
+
+
+def days_unresolved(incident: dict) -> int:
+    request_date = incident["request_date"]
+    if isinstance(request_date, str):
+        request_date = datetime.strptime(request_date[:10], "%Y-%m-%d").date()
+    resolve_date = incident.get("resolve_date")
+    if resolve_date:
+        if isinstance(resolve_date, str):
+            resolve_date = datetime.strptime(resolve_date[:10], "%Y-%m-%d").date()
+        return max((resolve_date - request_date).days, 0)
+    return max((date.today() - request_date).days, 0)
+
+
+def housing_violation_flag(incident: dict) -> str:
+    if incident["status"] in {"resolved", "closed"}:
+        return "resolved"
+    days = days_unresolved(incident)
+    severity = int(incident["severity_level"])
+    if severity >= 9 and days >= 1:
+        return "critical_overdue"
+    if severity >= 7 and days >= 3:
+        return "urgent_overdue"
+    if severity >= 5 and days >= 7:
+        return "standard_overdue"
+    if days >= 30:
+        return "long_running"
+    return "tracking"
+
+
+def enrich_housing_incident(incident: dict) -> dict:
+    return {
+        **incident,
+        "days_unresolved": days_unresolved(incident),
+        "violation_flag": housing_violation_flag(incident),
     }
 
 
@@ -565,6 +664,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ValueError:
             return None
 
+    def housing_id_from_path(self, path: str) -> int | None:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) != 3 or parts[0] != "api" or parts[1] != "housing":
+            return None
+        try:
+            return int(parts[2])
+        except ValueError:
+            return None
+
     def do_GET(self) -> None:
         if not self.rate_limit():
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
@@ -669,6 +777,42 @@ class ApiHandler(BaseHTTPRequestHandler):
             )
             return
 
+        if path == "/api/housing":
+            user = self.require_user()
+            if not user:
+                return
+            with db_cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT incident_id, category, description, area_location, request_date,
+                           resolve_date, severity_level, status, created_at, updated_at
+                    FROM housing_incidents
+                    WHERE user_id = %s
+                    ORDER BY
+                        CASE WHEN status IN ('resolved', 'closed') THEN 1 ELSE 0 END,
+                        severity_level DESC,
+                        request_date DESC
+                    """,
+                    (user["id"],),
+                )
+                incidents = [enrich_housing_incident(row) for row in cursor.fetchall()]
+            open_incidents = [item for item in incidents if item["status"] not in {"resolved", "closed"}]
+            overdue_incidents = [item for item in incidents if item["violation_flag"] not in {"resolved", "tracking"}]
+            log_event("housing_incident_list", user_id=user["id"], count=len(incidents), ip=self.client_ip())
+            self.send_json(
+                HTTPStatus.OK,
+                {
+                    "summary": {
+                        "incidentCount": len(incidents),
+                        "openIncidentCount": len(open_incidents),
+                        "overdueCount": len(overdue_incidents),
+                        "maxDaysUnresolved": max([item["days_unresolved"] for item in open_incidents], default=0),
+                    },
+                    "incidents": incidents,
+                },
+            )
+            return
+
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_POST(self) -> None:
@@ -756,6 +900,41 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.CREATED, {"grant": grant})
             return
 
+        if path == "/api/housing":
+            user = self.require_user()
+            if not user:
+                return
+            try:
+                values = housing_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO housing_incidents
+                        (user_id, category, description, area_location, request_date,
+                         resolve_date, severity_level, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING incident_id, category, description, area_location, request_date,
+                              resolve_date, severity_level, status, created_at, updated_at
+                    """,
+                    (
+                        user["id"],
+                        values["category"],
+                        values["description"],
+                        values["area_location"],
+                        values["request_date"],
+                        values["resolve_date"],
+                        values["severity_level"],
+                        values["status"],
+                    ),
+                )
+                incident = enrich_housing_incident(cursor.fetchone())
+            log_event("housing_incident_created", user_id=user["id"], incident_id=incident["incident_id"], ip=self.client_ip())
+            self.send_json(HTTPStatus.CREATED, {"incident": incident})
+            return
+
         self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
 
     def do_PUT(self) -> None:
@@ -765,13 +944,57 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         path = urlparse(self.path).path
         grant_id = self.grant_id_from_path(path)
-        if grant_id is None:
+        housing_id = self.housing_id_from_path(path)
+        if grant_id is None and housing_id is None:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
             return
 
         user = self.require_user()
         if not user:
             return
+        if housing_id is not None:
+            try:
+                values = housing_payload(self.read_json())
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    """
+                    UPDATE housing_incidents
+                    SET category = %s,
+                        description = %s,
+                        area_location = %s,
+                        request_date = %s,
+                        resolve_date = %s,
+                        severity_level = %s,
+                        status = %s,
+                        updated_at = now()
+                    WHERE incident_id = %s AND user_id = %s
+                    RETURNING incident_id, category, description, area_location, request_date,
+                              resolve_date, severity_level, status, created_at, updated_at
+                    """,
+                    (
+                        values["category"],
+                        values["description"],
+                        values["area_location"],
+                        values["request_date"],
+                        values["resolve_date"],
+                        values["severity_level"],
+                        values["status"],
+                        housing_id,
+                        user["id"],
+                    ),
+                )
+                incident = cursor.fetchone()
+            if not incident:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Housing incident not found"})
+                return
+            incident = enrich_housing_incident(incident)
+            log_event("housing_incident_updated", user_id=user["id"], incident_id=housing_id, ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, {"incident": incident})
+            return
+
         try:
             values = grant_payload(self.read_json())
         except ValueError as exc:
@@ -819,13 +1042,28 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         path = urlparse(self.path).path
         grant_id = self.grant_id_from_path(path)
-        if grant_id is None:
+        housing_id = self.housing_id_from_path(path)
+        if grant_id is None and housing_id is None:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
             return
 
         user = self.require_user()
         if not user:
             return
+        if housing_id is not None:
+            with db_cursor(commit=True) as cursor:
+                cursor.execute(
+                    "DELETE FROM housing_incidents WHERE incident_id = %s AND user_id = %s RETURNING incident_id",
+                    (housing_id, user["id"]),
+                )
+                deleted = cursor.fetchone()
+            if not deleted:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Housing incident not found"})
+                return
+            log_event("housing_incident_deleted", user_id=user["id"], incident_id=housing_id, ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, {"ok": True})
+            return
+
         with db_cursor(commit=True) as cursor:
             cursor.execute(
                 "DELETE FROM grant_ledger WHERE id = %s AND user_id = %s RETURNING id",
