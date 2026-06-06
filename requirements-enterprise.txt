@@ -1,0 +1,11 @@
+numpy
+pandas
+torch
+yfinance
+qiskit
+qiskit-ibm-runtime
+scipy
+openpyxl
+rich
+python-dotenv
+

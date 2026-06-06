@@ -21,6 +21,7 @@ Create a `.env` file in this repo if you later add Qiskit integration:
 
 ```text
 IBM_QUANTUM_TOKEN=paste_token_here
+IBM_QUANTUM_INSTANCE=paste_instance_crn_or_service_name_here
 ```
 
 The `.gitignore` file already ignores `.env`.
@@ -37,3 +38,4 @@ pip install qiskit qiskit-ibm-runtime python-dotenv
 
 Then the adapter can read `IBM_QUANTUM_TOKEN` from `.env` and submit the same circuit to IBM.
 
+For the strict V10 script, the account must also provide `IBM_QUANTUM_INSTANCE`. IBM's current Runtime docs recommend passing the instance CRN/service identifier with the token so Runtime can select the correct account instance.

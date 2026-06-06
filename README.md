@@ -15,6 +15,7 @@ python housing_violations.py summarize
 python shell_catalog.py estimate
 python quantum_portfolio.py --capital 1000
 python qml_signal_engine.py --capital 1000
+python strict_macro_quantum_v10.py --preflight
 ```
 
 The scripts write results into the `output` folder.
@@ -26,6 +27,7 @@ The scripts write results into the `output` folder.
 - `shell_catalog.py` estimates collectible ranges only from comparable sale values you provide in `data/shell_items.csv`.
 - `quantum_portfolio.py` runs a local quantum-inspired paper portfolio optimizer from `data/portfolio_assets.csv`.
 - `qml_signal_engine.py` runs a local QML-shaped paper signal engine from `data/market_features.csv`.
+- `strict_macro_quantum_v10.py` is the hard-dependency IBM/Qiskit/yfinance/Torch version. It fails fast if the enterprise stack, `.env` token, live market data, or IBM Runtime connection is unavailable.
 
 ## How To Use For Real
 
