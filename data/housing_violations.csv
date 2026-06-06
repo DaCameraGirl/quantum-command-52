@@ -1,0 +1,5 @@
+date,landlord,property,issue,severity,status,penalty,evidence_file,notes
+2026-06-01,Sample Landlord,123 Main St,No hot water,9,unresolved,500,photos/hot-water.jpg,Replace with real records.
+2026-06-03,Sample Landlord,123 Main St,Unsafe lock,8,unresolved,250,photos/lock.jpg,Ask for written repair timeline.
+2026-05-20,Sample Landlord,123 Main St,Paint damage,3,resolved,0,,Low priority example.
+

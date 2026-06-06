@@ -1,0 +1,5 @@
+grant_name,source_url,amount_min,amount_max,deadline,eligibility,women_focused,emergency_funding,no_cosigner,status,notes
+Sample Emergency Aid Fund,https://example.org/official-application,500,2500,2026-07-15,"Adults with urgent housing, school, or safety expenses",yes,yes,yes,research,Replace this sample with a real official source.
+Sample Workforce Scholarship,https://example.org/workforce-scholarship,1000,6000,2026-08-30,"Training, school, certification, and job placement support",yes,no,yes,research,Check whether residency and income limits apply.
+Sample Local Hardship Grant,https://example.org/hardship,250,1000,2026-06-25,"Emergency rent, utilities, transportation, or documentation costs",no,yes,yes,research,Call before applying because funds may run out.
+
