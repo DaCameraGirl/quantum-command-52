@@ -1,0 +1,5 @@
+ticker,name,current_price,expected_return,volatility,risk_limit,notes
+BTC,Bitcoin,67000.00,0.24,0.46,0.45,Sample only. Replace with your own research.
+ETH,Ethereum,3500.00,0.18,0.42,0.45,Sample only. Replace with your own research.
+SOL,Solana,160.00,0.35,0.62,0.35,Sample only. Replace with your own research.
+NVDA,NVIDIA Corp,120.00,0.28,0.38,0.45,Sample only. Replace with your own research.

@@ -13,6 +13,8 @@ cd C:\Users\enter\angela-practical-funding-toolkit
 python grants.py rank
 python housing_violations.py summarize
 python shell_catalog.py estimate
+python quantum_portfolio.py --capital 1000
+python qml_signal_engine.py --capital 1000
 ```
 
 The scripts write results into the `output` folder.
@@ -22,6 +24,8 @@ The scripts write results into the `output` folder.
 - `grants.py` ranks grant/scholarship/emergency aid opportunities from `data/grants.csv`.
 - `housing_violations.py` summarizes unresolved housing issues from `data/housing_violations.csv`.
 - `shell_catalog.py` estimates collectible ranges only from comparable sale values you provide in `data/shell_items.csv`.
+- `quantum_portfolio.py` runs a local quantum-inspired paper portfolio optimizer from `data/portfolio_assets.csv`.
+- `qml_signal_engine.py` runs a local QML-shaped paper signal engine from `data/market_features.csv`.
 
 ## How To Use For Real
 
@@ -33,6 +37,6 @@ The scripts write results into the `output` folder.
 ## Important Limits
 
 - No script can guarantee a grant, settlement, or sale price.
+- No script is financial advice or a trading bot.
 - Do not send private documents to random websites.
 - For legal action, use the housing summary as an organizer and talk to a qualified tenant/legal aid office.
-
