@@ -25,6 +25,8 @@ class AppSettings(BaseModel):
     rate_limit_api_per_minute: int = Field(default=120, ge=1, le=3000)
     dashboard_host: str = "127.0.0.1"
     dashboard_port: int = Field(default=8787, ge=1, le=65535)
+    app_environment: str = "development"
+    require_alembic_migrations: bool = False
     stripe_secret_key: SecretStr | None = None
     stripe_webhook_secret: SecretStr | None = None
     stripe_success_url: str = "http://127.0.0.1:5173/?checkout=success"
@@ -81,6 +83,14 @@ class AppSettings(BaseModel):
             raise ValueError("Stripe price IDs must start with price_")
         return value
 
+    @field_validator("app_environment")
+    @classmethod
+    def validate_environment(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"development", "test", "staging", "production"}:
+            raise ValueError("APP_ENV must be development, test, staging, or production")
+        return normalized
+
     @cached_property
     def allowed_origin_set(self) -> set[str]:
         return set(self.allowed_origins)
@@ -119,6 +129,8 @@ def load_settings_from_env() -> AppSettings:
             rate_limit_api_per_minute=os.environ.get("RATE_LIMIT_API_PER_MINUTE", "120"),
             dashboard_host=os.environ.get("DASHBOARD_HOST", "127.0.0.1"),
             dashboard_port=os.environ.get("DASHBOARD_PORT", "8787"),
+            app_environment=os.environ.get("APP_ENV", "development"),
+            require_alembic_migrations=bool_env("REQUIRE_ALEMBIC_MIGRATIONS", "false") in {"1", "true", "yes"},
             stripe_secret_key=SecretStr(os.environ["STRIPE_SECRET_KEY"].strip()) if os.environ.get("STRIPE_SECRET_KEY", "").strip() else None,
             stripe_webhook_secret=SecretStr(os.environ["STRIPE_WEBHOOK_SECRET"].strip()) if os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip() else None,
             stripe_success_url=os.environ.get("STRIPE_SUCCESS_URL", "http://127.0.0.1:5173/?checkout=success"),

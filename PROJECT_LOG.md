@@ -17,6 +17,32 @@ This log records the build history for Repo 52 in plain operational language. It
 
 ## Release Ledger
 
+### Current release - Add billing UI, chunk splitting, and Alembic-only production boot
+
+Status: verified locally, pending push
+
+Added the next production hardening layer:
+
+- React Billing tab with Starter, Pro, and Enterprise plan cards.
+- Checkout buttons call authenticated `POST /api/stripe/checkout`.
+- Successful checkout creation redirects the user to Stripe's hosted payment form.
+- Billing UI documents the request path, tier payload, JWT boundary, and Stripe redirect handoff.
+- Side rail and module tabs now include Billing and Transactions consistently.
+- Vite Rollup `manualChunks` now separates React, Recharts/D3, Lucide icons, and remaining vendor modules.
+- Pydantic config now supports `APP_ENV` and `REQUIRE_ALEMBIC_MIGRATIONS`.
+- Production startup skips the legacy `init_db()` fallback and verifies the Alembic revision table instead.
+- Docker Compose now includes a `migrate` service that runs `alembic upgrade head` before the app service boots.
+- README and production env example document the stricter migration behavior.
+
+Verification:
+
+- `py -3.11 -m py_compile app_config.py server.py seed_transactions.py alembic\env.py alembic\versions\001_initial_enterprise_schema.py` passed.
+- `npm run build` passed with no large chunk warning and no circular chunk warning.
+- Build output includes separate `vendor-icons`, `vendor-react`, and `vendor-charts` chunks.
+- `alembic heads` detected `001_initial_enterprise_schema` as the active migration head.
+- Production config smoke test confirmed `APP_ENV=production`, `REQUIRE_ALEMBIC_MIGRATIONS=true`, and Stripe tier Price ID parsing.
+- `git diff --check` passed.
+
 ### Current release - Add enterprise runtime, tracing, OpenAPI, and migrations
 
 Status: verified locally, pending push

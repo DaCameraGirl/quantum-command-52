@@ -13,6 +13,22 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-quantum_app}:${POSTGRES_PASSWORD:-change-me-in-env}@postgres:5432/${POSTGRES_DB:-quantum_command_52}
+      DATABASE_POOL_MIN: ${DATABASE_POOL_MIN:-1}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      APP_ENV: ${APP_ENV:-production}
+      REQUIRE_ALEMBIC_MIGRATIONS: ${REQUIRE_ALEMBIC_MIGRATIONS:-true}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+
   app:
     build:
       context: .
@@ -23,6 +39,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-quantum_app}:${POSTGRES_PASSWORD:-change-me-in-env}@postgres:5432/${POSTGRES_DB:-quantum_command_52}
       DATABASE_POOL_MIN: ${DATABASE_POOL_MIN:-1}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
+      APP_ENV: ${APP_ENV:-production}
+      REQUIRE_ALEMBIC_MIGRATIONS: ${REQUIRE_ALEMBIC_MIGRATIONS:-true}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-1209600}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
@@ -37,8 +55,8 @@ services:
       STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
       STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8080:8787"
 

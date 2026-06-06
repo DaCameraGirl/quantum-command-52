@@ -46,6 +46,7 @@ RATE_LIMIT_LOCK = threading.Lock()
 RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 SENSITIVE_LOG_KEYS = {"secret", "password", "token", "key", "database_url", "dsn"}
 STRIPE_CHECKOUT_ENDPOINT = "https://api.stripe.com/v1/checkout/sessions"
+REQUIRED_ALEMBIC_REVISION = "001_initial_enterprise_schema"
 
 
 def utc_now() -> datetime:
@@ -324,6 +325,23 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_stripe_events_type_received
                 ON stripe_webhook_events(event_type, received_at DESC);
             """
+        )
+
+
+def require_alembic_schema() -> None:
+    with db_cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT version_num
+            FROM alembic_version
+            WHERE version_num = %s
+            """,
+            (REQUIRED_ALEMBIC_REVISION,),
+        )
+        row = cursor.fetchone()
+    if not row:
+        raise RuntimeError(
+            "Alembic migration check failed. Run `alembic upgrade head` before starting the production server."
         )
 
 
@@ -2148,10 +2166,15 @@ def main() -> None:
     load_dotenv_file()
     config = load_app_settings()
     init_pool()
-    init_db()
+    if config.app_environment == "production" or config.require_alembic_migrations:
+        require_alembic_schema()
+        schema_mode = "alembic_only"
+    else:
+        init_db()
+        schema_mode = "startup_initializer"
     host = config.dashboard_host
     port = config.dashboard_port
-    log_event("api_started", host=host, port=port, database="postgresql", auth="jwt")
+    log_event("api_started", host=host, port=port, database="postgresql", auth="jwt", schema_mode=schema_mode)
     ThreadingHTTPServer((host, port), ApiHandler).serve_forever()
 
 

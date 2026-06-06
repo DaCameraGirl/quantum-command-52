@@ -9,8 +9,10 @@ import {
   CalendarClock,
   CheckCircle2,
   CircuitBoard,
+  CreditCard,
   Database,
   DollarSign,
+  ExternalLink,
   FileSearch,
   Gauge,
   Gem,
@@ -1211,6 +1213,133 @@ function ItemCatalogEngine() {
   );
 }
 
+const BILLING_TIERS = [
+  {
+    id: "starter",
+    name: "Starter",
+    price: "$49",
+    cadence: "monthly",
+    tone: "blue",
+    detail: "Single-operator command center with portfolio, grant, housing, inventory, and deal tracking.",
+    limits: ["1 command seat", "Core ledgers", "Stripe-hosted checkout"],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "$149",
+    cadence: "monthly",
+    tone: "green",
+    detail: "Expanded Data-Analytics workflow for active client files and recurring transaction reviews.",
+    limits: ["Priority transaction board", "Evidence and asset workflows", "Billing status sync"],
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: "Custom",
+    cadence: "contract",
+    tone: "violet",
+    detail: "Brokerage-scale controls for multi-tenant deployments, audit posture, and hardened infrastructure.",
+    limits: ["Multi-tenant deployment", "Migration-led database ops", "OpenAPI contract access"],
+  },
+];
+
+function BillingConsole() {
+  const [selectedTier, setSelectedTier] = useState("pro");
+  const [loadingTier, setLoadingTier] = useState("");
+  const [error, setError] = useState("");
+  const selectedPlan = BILLING_TIERS.find((tier) => tier.id === selectedTier) || BILLING_TIERS[1];
+
+  async function beginCheckout(tierId) {
+    setError("");
+    setSelectedTier(tierId);
+    setLoadingTier(tierId);
+    try {
+      const payload = await api("/api/stripe/checkout", {
+        method: "POST",
+        body: JSON.stringify({ tier: tierId }),
+      });
+      if (!payload.url) {
+        throw new Error("Stripe did not return a checkout URL.");
+      }
+      window.location.assign(payload.url);
+    } catch (err) {
+      setError(err.message);
+      setLoadingTier("");
+    }
+  }
+
+  return (
+    <section className="billing-console">
+      <div className="grant-head">
+        <div>
+          <p className="eyebrow">Stripe billing control</p>
+          <h2>Subscription Checkout Console</h2>
+          <p>Choose a Data-Analytics tier and launch the secure Stripe-hosted payment form from the authenticated backend.</p>
+        </div>
+        <div className="billing-seal">
+          <ShieldCheck size={18} />
+          <span>Server-mapped Price IDs</span>
+        </div>
+      </div>
+
+      {error && <div className="error-line">{error}</div>}
+
+      <div className="billing-layout">
+        <section className="billing-plans" aria-label="Subscription plans">
+          {BILLING_TIERS.map((tier) => (
+            <article className={`billing-plan ${tier.tone} ${selectedTier === tier.id ? "selected" : ""}`} key={tier.id}>
+              <div className="billing-plan-head">
+                <div>
+                  <p className="eyebrow">{tier.cadence}</p>
+                  <h3>{tier.name}</h3>
+                </div>
+                <strong>{tier.price}</strong>
+              </div>
+              <p>{tier.detail}</p>
+              <div className="billing-limits">
+                {tier.limits.map((limit) => (
+                  <span key={limit}>
+                    <CheckCircle2 size={15} /> {limit}
+                  </span>
+                ))}
+              </div>
+              <button className="primary-action" onClick={() => beginCheckout(tier.id)} type="button" disabled={Boolean(loadingTier)}>
+                {loadingTier === tier.id ? "Opening Stripe..." : "Start checkout"} <ExternalLink size={17} />
+              </button>
+            </article>
+          ))}
+        </section>
+
+        <aside className="checkout-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">Checkout packet</p>
+              <h2>{selectedPlan.name} handoff</h2>
+            </div>
+            <CreditCard size={18} />
+          </div>
+          <div className="checkout-route">
+            <span>Browser action</span>
+            <strong>POST /api/stripe/checkout</strong>
+          </div>
+          <div className="checkout-route">
+            <span>Payload</span>
+            <strong>{`{ "tier": "${selectedPlan.id}" }`}</strong>
+          </div>
+          <div className="checkout-route">
+            <span>Security boundary</span>
+            <strong>JWT cookie required</strong>
+          </div>
+          <div className="checkout-route">
+            <span>Redirect target</span>
+            <strong>Stripe hosted session</strong>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function ToolPanel({ activeTab }) {
   if (activeTab === "grants") {
     return <GrantOptimizer />;
@@ -1226,6 +1355,10 @@ function ToolPanel({ activeTab }) {
 
   if (activeTab === "transactions") {
     return <TransactionPipelineBoard />;
+  }
+
+  if (activeTab === "billing") {
+    return <BillingConsole />;
   }
 
   const content = {
@@ -1325,6 +1458,9 @@ function Dashboard({ user, onLogout }) {
         </button>
         <button className={activeTab === "transactions" ? "rail-active" : ""} onClick={() => setActiveTab("transactions")} title="Transaction Pipeline">
           <Building2 size={20} />
+        </button>
+        <button className={activeTab === "billing" ? "rail-active" : ""} onClick={() => setActiveTab("billing")} title="Billing">
+          <CreditCard size={20} />
         </button>
       </aside>
 
@@ -1481,6 +1617,12 @@ function Dashboard({ user, onLogout }) {
               </button>
               <button className={activeTab === "catalog" ? "active" : ""} onClick={() => setActiveTab("catalog")} type="button">
                 <FileSearch size={17} /> Catalog
+              </button>
+              <button className={activeTab === "transactions" ? "active" : ""} onClick={() => setActiveTab("transactions")} type="button">
+                <Building2 size={17} /> Deals
+              </button>
+              <button className={activeTab === "billing" ? "active" : ""} onClick={() => setActiveTab("billing")} type="button">
+                <CreditCard size={17} /> Billing
               </button>
             </section>
             <ToolPanel activeTab={activeTab} />

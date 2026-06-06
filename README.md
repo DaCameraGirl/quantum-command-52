@@ -105,6 +105,8 @@ STRIPE_PRICE_ENTERPRISE=price_replace_with_enterprise_price_id
 
 The backend exposes authenticated `POST /api/stripe/checkout`. The browser sends a tier (`starter`, `pro`, or `enterprise`), the server maps it to a configured Stripe Price ID, and Stripe returns a Checkout redirect URL. The browser never chooses arbitrary price IDs.
 
+The React dashboard includes a Billing tab that calls this endpoint and redirects the signed-in user to Stripe's hosted Checkout page.
+
 The backend exposes `POST /api/stripe/webhook`. It verifies the `Stripe-Signature` header, records every accepted event in `stripe_webhook_events`, and updates `billing_accounts` for checkout, subscription, payment-failed, and subscription-paused events.
 
 ## API Contract
@@ -118,7 +120,7 @@ Authenticated routes accept either the `access_token` JWT cookie or a bearer JWT
 
 ## Database Migrations
 
-The backend still has a startup schema initializer for local compatibility, but production schema changes should move through Alembic migrations.
+The backend still has a startup schema initializer for local development compatibility, but production mode is Alembic-only. When `APP_ENV=production` or `REQUIRE_ALEMBIC_MIGRATIONS=true`, `server.py` skips the legacy `init_db()` fallback and refuses to boot unless the expected Alembic revision is present.
 
 Run migrations from PowerShell:
 
@@ -164,8 +166,11 @@ Services:
 
 - App and API: `http://127.0.0.1:8080`
 - PostgreSQL: internal Docker network with persistent `postgres_data` volume
+- Migration job: `migrate` runs `alembic upgrade head` before the app starts
 
 The production `Dockerfile` is a monorepo multi-stage build. Stage 1 compiles the React/Vite dashboard; Stage 2 installs the Python API dependencies, copies the compiled dashboard assets, and serves both the frontend and `/api/*` routes from one hardened runtime container.
+
+The Vite production build uses manual Rollup chunks for React, Recharts/D3, Lucide icons, and remaining vendor modules so dashboard bundles stay split by dependency family.
 
 ## How To Use For Real
 
