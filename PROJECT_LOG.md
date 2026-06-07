@@ -36,6 +36,10 @@ Added the Sprint 1 and Sprint 2 foundation:
 - Classical mode writes a practical risk-adjusted paper ledger; QAOA mode writes a statevector QAOA workbook and prints the exact-optimum match check.
 - QAOA mode now persists each completed run into the local dashboard SQLite archive.
 - Macro dashboard now displays the latest saved QAOA run, including QAOA bits, exact bits, selected assets, cost gap, and top sampled bitstrings.
+- Added local optimizer job queue storage in SQLite with queued/running/succeeded/failed status tracking.
+- Added demo-mode `POST /api/optimizer/jobs`, `GET /api/optimizer/jobs`, and `GET /api/optimizer/jobs/{job_id}` endpoints.
+- Added a bounded backend worker thread that runs local statevector QAOA without blocking the browser request.
+- Added a dashboard QAOA job runner panel with asset, budget, reps, shots, and iteration controls plus polling status cards.
 
 Verification:
 
@@ -46,6 +50,7 @@ Verification:
 - `/api/optimizer` payload smoke test returned the quantum mode payload successfully.
 - `py -3.11 qaoa_portfolio_optimizer.py` matched the brute-force optimum on the local QAOA demo.
 - Dashboard build includes the QAOA results archive panel and refresh control.
+- Optimizer job payload/table smoke checks passed without requiring a long QAOA run.
 - `.gitignore` already excludes `web-dashboard/*.db` and `web-dashboard/*.db-*`.
 
 ### Current release - Add local demo mode for desktop launcher

@@ -1395,6 +1395,16 @@ function Dashboard({ user, onLogout }) {
   const [optimizerError, setOptimizerError] = useState("");
   const [optimizerRuns, setOptimizerRuns] = useState(null);
   const [optimizerRunsError, setOptimizerRunsError] = useState("");
+  const [optimizerJobs, setOptimizerJobs] = useState(null);
+  const [optimizerJobsError, setOptimizerJobsError] = useState("");
+  const [optimizerJobForm, setOptimizerJobForm] = useState({
+    assets: "BTC,ETH,SOL,NVDA",
+    budget: "2",
+    reps: "1",
+    shots: "1024",
+    maxiter: "40",
+  });
+  const [queueingOptimizerJob, setQueueingOptimizerJob] = useState(false);
 
   useEffect(() => {
     api("/api/portfolio").then(setData).catch((err) => setError(err.message));
@@ -1425,9 +1435,54 @@ function Dashboard({ user, onLogout }) {
     }
   }
 
+  async function loadOptimizerJobs() {
+    setOptimizerJobsError("");
+    try {
+      const payload = await api("/api/optimizer/jobs");
+      setOptimizerJobs(payload);
+    } catch (err) {
+      setOptimizerJobsError(err.message);
+    }
+  }
+
   useEffect(() => {
     loadOptimizerRuns();
+    loadOptimizerJobs();
   }, []);
+
+  useEffect(() => {
+    const activeJobs = optimizerJobs?.jobs?.some((job) => ["queued", "running"].includes(job.status));
+    if (!activeJobs) return undefined;
+    const timer = setInterval(() => {
+      loadOptimizerJobs();
+      loadOptimizerRuns();
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [optimizerJobs]);
+
+  async function queueOptimizerJob(event) {
+    event.preventDefault();
+    setQueueingOptimizerJob(true);
+    setOptimizerJobsError("");
+    try {
+      await api("/api/optimizer/jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          assets: optimizerJobForm.assets,
+          budget: optimizerJobForm.budget,
+          reps: optimizerJobForm.reps,
+          shots: optimizerJobForm.shots,
+          maxiter: optimizerJobForm.maxiter,
+        }),
+      });
+      await loadOptimizerJobs();
+      await loadOptimizerRuns();
+    } catch (err) {
+      setOptimizerJobsError(err.message);
+    } finally {
+      setQueueingOptimizerJob(false);
+    }
+  }
 
   const assets = data?.assets || [];
   const summary = data?.summary || {};
@@ -1473,6 +1528,7 @@ function Dashboard({ user, onLogout }) {
   ];
 
   const latestQaoaRun = optimizerRuns?.latest || null;
+  const latestOptimizerJob = optimizerJobs?.latest || null;
 
   return (
     <main className="command-shell">
@@ -1723,6 +1779,84 @@ function Dashboard({ user, onLogout }) {
                         Run <code>py -3.11 strict_macro_quantum_v10.py --optimizer-mode qaoa</code> to save the first QAOA result into the dashboard archive.
                       </div>
                     )}
+                  </div>
+
+                  <div className="control-panel span-2 optimizer-job-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Optimizer job runner</p>
+                        <h2>Queued Local QAOA Execution</h2>
+                      </div>
+                      <StatusPill status={latestOptimizerJob?.status || "Ready"} />
+                    </div>
+                    <form className="optimizer-job-form" onSubmit={queueOptimizerJob}>
+                      <label>
+                        Assets
+                        <input
+                          value={optimizerJobForm.assets}
+                          onChange={(event) => setOptimizerJobForm({ ...optimizerJobForm, assets: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Budget
+                        <input
+                          type="number"
+                          min="1"
+                          max="4"
+                          value={optimizerJobForm.budget}
+                          onChange={(event) => setOptimizerJobForm({ ...optimizerJobForm, budget: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Reps
+                        <input
+                          type="number"
+                          min="1"
+                          max="2"
+                          value={optimizerJobForm.reps}
+                          onChange={(event) => setOptimizerJobForm({ ...optimizerJobForm, reps: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Shots
+                        <input
+                          type="number"
+                          min="256"
+                          max="2048"
+                          step="256"
+                          value={optimizerJobForm.shots}
+                          onChange={(event) => setOptimizerJobForm({ ...optimizerJobForm, shots: event.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Max iter
+                        <input
+                          type="number"
+                          min="10"
+                          max="100"
+                          value={optimizerJobForm.maxiter}
+                          onChange={(event) => setOptimizerJobForm({ ...optimizerJobForm, maxiter: event.target.value })}
+                        />
+                      </label>
+                      <button className="primary-action" type="submit" disabled={queueingOptimizerJob}>
+                        <CircuitBoard size={16} /> {queueingOptimizerJob ? "Queueing..." : "Run QAOA"}
+                      </button>
+                    </form>
+                    {optimizerJobsError && <div className="error-line">{optimizerJobsError}</div>}
+                    <div className="optimizer-job-grid">
+                      {(optimizerJobs?.jobs || []).slice(0, 4).map((job) => (
+                        <div className="optimizer-job-card" key={job.job_id}>
+                          <div>
+                            <span>Job {job.job_id}</span>
+                            <strong>{job.status}</strong>
+                          </div>
+                          <small>{(job.assets || []).join(", ")} | budget {job.budget} | reps {job.reps}</small>
+                          {job.durationSeconds != null && <small>{job.durationSeconds}s runtime</small>}
+                          {job.error && <p>{job.error}</p>}
+                        </div>
+                      ))}
+                      {!(optimizerJobs?.jobs || []).length && <div className="empty-panel">No queued optimizer jobs yet.</div>}
+                    </div>
                   </div>
 
                   <div className="control-panel">

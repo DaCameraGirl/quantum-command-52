@@ -9,6 +9,7 @@ import mimetypes
 import os
 import secrets
 import sqlite3
+import sys
 import threading
 import time
 import uuid
@@ -63,6 +64,7 @@ DEMO_DB: dict[str, list[dict]] = {
     "inventory": [],
     "transactions": [],
     "optimizer_runs": [],
+    "optimizer_jobs": [],
 }
 DEMO_TABLES = {
     "grants": ("demo_grants", "id"),
@@ -70,6 +72,7 @@ DEMO_TABLES = {
     "inventory": ("demo_inventory", "item_id"),
     "transactions": ("demo_transactions", "transactionId"),
     "optimizer_runs": ("demo_optimizer_runs", "run_id"),
+    "optimizer_jobs": ("demo_optimizer_jobs", "job_id"),
 }
 DEMO_CORE_TABLES = ("grants", "housing", "inventory", "transactions")
 
@@ -469,6 +472,25 @@ def save_demo_memory_to_sqlite() -> None:
             connection.commit()
 
 
+def upsert_demo_sqlite_row(logical_name: str, payload: dict) -> None:
+    init_demo_sqlite()
+    table_name, key_name = DEMO_TABLES[logical_name]
+    key_value = int(payload[key_name])
+    with DEMO_LOCK:
+        with sqlite3.connect(DEMO_SQLITE_FILE) as connection:
+            connection.execute(
+                f"""
+                INSERT OR REPLACE INTO {table_name} ({key_name}, payload_json, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """,
+                (key_value, json.dumps(payload, default=str)),
+            )
+            connection.commit()
+        rows = [row for row in DEMO_DB[logical_name] if int(row[key_name]) != key_value]
+        rows.append(payload)
+        DEMO_DB[logical_name] = rows
+
+
 def demo_assets() -> list[dict]:
     now = utc_now()
     return [
@@ -845,6 +867,158 @@ def demo_optimizer_runs_payload() -> dict:
         "latest": latest,
         "runs": runs[:10],
     }
+
+
+def demo_optimizer_jobs_payload() -> dict:
+    jobs = sorted(DEMO_DB["optimizer_jobs"], key=lambda job: int(job.get("job_id", 0)), reverse=True)
+    active_jobs = [job for job in jobs if job.get("status") in {"queued", "running"}]
+    latest = jobs[0] if jobs else None
+    return {
+        "summary": {
+            "jobCount": len(jobs),
+            "activeJobCount": len(active_jobs),
+            "latestStatus": latest.get("status") if latest else "none",
+        },
+        "latest": latest,
+        "jobs": jobs[:10],
+    }
+
+
+def clean_optimizer_job_payload(payload: dict) -> dict:
+    default_assets = [ticker for ticker, *_rest in DEFAULT_ASSETS]
+    requested_assets = payload.get("assets") or default_assets
+    if isinstance(requested_assets, str):
+        requested_assets = [item.strip().upper() for item in requested_assets.split(",") if item.strip()]
+    assets = [str(asset).strip().upper() for asset in requested_assets if str(asset).strip()]
+    allowed = {ticker for ticker, *_rest in DEFAULT_ASSETS}
+    assets = [asset for asset in assets if asset in allowed]
+    if len(assets) < 2:
+        assets = default_assets
+
+    def bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:
+        try:
+            value = int(payload.get(name, default))
+        except (TypeError, ValueError):
+            value = default
+        return max(minimum, min(maximum, value))
+
+    budget = bounded_int("budget", max(1, round(len(assets) * 0.6)), 1, len(assets))
+    return {
+        "assets": assets,
+        "budget": budget,
+        "reps": bounded_int("reps", 1, 1, 2),
+        "maxiter": bounded_int("maxiter", 40, 10, 100),
+        "shots": bounded_int("shots", 1024, 256, 2048),
+    }
+
+
+def covariance_from_default_assets(assets: list[str]) -> tuple[list[str], object, object]:
+    import numpy as np
+
+    by_ticker = {ticker: (expected_return, volatility) for ticker, _name, _weight, _cash, expected_return, volatility in DEFAULT_ASSETS}
+    selected_assets = [asset for asset in assets if asset in by_ticker]
+    returns = np.array([by_ticker[asset][0] for asset in selected_assets], dtype=float)
+    volatilities = np.array([by_ticker[asset][1] for asset in selected_assets], dtype=float)
+    correlation = np.full((len(selected_assets), len(selected_assets)), 0.18)
+    np.fill_diagonal(correlation, 1.0)
+    covariance = np.outer(volatilities, volatilities) * correlation
+    covariance += np.eye(len(selected_assets)) * 1e-6
+    return selected_assets, returns, covariance
+
+
+def run_demo_optimizer_job(job: dict) -> None:
+    started_at = utc_now()
+    job.update({"status": "running", "startedAt": started_at, "updatedAt": started_at})
+    upsert_demo_sqlite_row("optimizer_jobs", job)
+    try:
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        from qaoa_portfolio_optimizer import build_qubo, optimize_portfolio_qaoa, portfolio_energy
+
+        assets, mu, covariance = covariance_from_default_assets(job["assets"])
+        result = optimize_portfolio_qaoa(
+            assets,
+            mu,
+            covariance,
+            budget=int(job["budget"]),
+            reps=int(job["reps"]),
+            maxiter=int(job["maxiter"]),
+            shots=int(job["shots"]),
+        )
+        q_matrix = build_qubo(mu, covariance, int(job["budget"]), risk_factor=0.5, penalty=2.0)
+        top_counts = sorted(result.counts.items(), key=lambda item: item[1], reverse=True)[:8]
+        run_id = int(time.time() * 1000)
+        run_payload = {
+            "run_id": run_id,
+            "mode": "qaoa",
+            "assets": assets,
+            "budget": int(job["budget"]),
+            "reps": int(job["reps"]),
+            "maxiter": int(job["maxiter"]),
+            "shots": int(job["shots"]),
+            "qaoaBits": result.qaoa_bits,
+            "exactBits": result.exact_bits,
+            "matchedExact": result.matched_exact,
+            "selectedTickers": result.selected_tickers,
+            "qaoaCost": round(result.qaoa_cost, 8),
+            "exactCost": round(result.exact_cost, 8),
+            "costGap": round(abs(result.qaoa_cost - result.exact_cost), 8),
+            "optimizerEnergy": round(result.optimizer_energy, 8),
+            "topCounts": [
+                {"bits": bits, "shots": count, "probability": round(count / int(job["shots"]), 6), "cost": round(portfolio_energy(bits, q_matrix), 8)}
+                for bits, count in top_counts
+            ],
+            "workbook": "dashboard-local-worker",
+            "createdAt": utc_now(),
+        }
+        upsert_demo_sqlite_row("optimizer_runs", run_payload)
+        finished_at = utc_now()
+        job.update(
+            {
+                "status": "succeeded",
+                "resultRunId": run_id,
+                "finishedAt": finished_at,
+                "updatedAt": finished_at,
+                "durationSeconds": round((finished_at - started_at).total_seconds(), 2),
+                "error": "",
+            }
+        )
+        log_event("demo_optimizer_job_succeeded", job_id=job["job_id"], run_id=run_id, assets=assets)
+    except Exception as exc:
+        finished_at = utc_now()
+        job.update(
+            {
+                "status": "failed",
+                "finishedAt": finished_at,
+                "updatedAt": finished_at,
+                "durationSeconds": round((finished_at - started_at).total_seconds(), 2),
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+        )
+        log_event("demo_optimizer_job_failed", job_id=job["job_id"], error=job["error"])
+    finally:
+        upsert_demo_sqlite_row("optimizer_jobs", job)
+
+
+def queue_demo_optimizer_job(payload: dict) -> dict:
+    values = clean_optimizer_job_payload(payload)
+    now = utc_now()
+    job = {
+        "job_id": int(time.time() * 1000),
+        "status": "queued",
+        "mode": "qaoa",
+        **values,
+        "error": "",
+        "resultRunId": None,
+        "createdAt": now,
+        "startedAt": None,
+        "finishedAt": None,
+        "updatedAt": now,
+    }
+    upsert_demo_sqlite_row("optimizer_jobs", job)
+    worker = threading.Thread(target=run_demo_optimizer_job, args=(dict(job),), daemon=True)
+    worker.start()
+    return job
 
 
 def normalized_weights(raw_scores: list[float]) -> list[float]:
@@ -1998,6 +2172,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ValueError:
             return None
 
+    def optimizer_job_id_from_path(self, path: str) -> int | None:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) != 4 or parts[0] != "api" or parts[1] != "optimizer" or parts[2] != "jobs":
+            return None
+        try:
+            return int(parts[3])
+        except ValueError:
+            return None
+
     def send_demo_session(self) -> None:
         self.send_json(
             HTTPStatus.OK,
@@ -2037,6 +2220,20 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.log_event("demo_optimizer_run_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["optimizer_runs"]), ip=self.client_ip())
             self.send_json(HTTPStatus.OK, demo_optimizer_runs_payload())
             return True
+        if path == "/api/optimizer/jobs":
+            load_demo_memory_from_sqlite()
+            self.log_event("demo_optimizer_job_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["optimizer_jobs"]), ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, demo_optimizer_jobs_payload())
+            return True
+        job_id = self.optimizer_job_id_from_path(path)
+        if job_id is not None:
+            load_demo_memory_from_sqlite()
+            job = next((item for item in DEMO_DB["optimizer_jobs"] if int(item["job_id"]) == job_id), None)
+            if not job:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Optimizer job not found"})
+            else:
+                self.send_json(HTTPStatus.OK, {"job": job})
+            return True
         return False
 
     def handle_demo_post(self, path: str, payload: dict) -> bool:
@@ -2049,6 +2246,11 @@ class ApiHandler(BaseHTTPRequestHandler):
             return True
         if path == "/api/stripe/checkout":
             self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Stripe Checkout is disabled in local demo mode."})
+            return True
+        if path == "/api/optimizer/jobs":
+            job = queue_demo_optimizer_job(payload)
+            self.log_event("demo_optimizer_job_queued", user_id=DEMO_USER["id"], job_id=job["job_id"], ip=self.client_ip())
+            self.send_json(HTTPStatus.ACCEPTED, {"job": job})
             return True
         if path == "/api/grants":
             try:

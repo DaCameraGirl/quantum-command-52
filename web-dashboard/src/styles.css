@@ -730,6 +730,69 @@ select:focus {
   background: #050a12;
 }
 
+.optimizer-job-panel {
+  align-content: start;
+}
+
+.optimizer-job-form {
+  display: grid;
+  grid-template-columns: 1.25fr repeat(4, 0.58fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 0;
+}
+
+.optimizer-job-form input {
+  min-height: 40px;
+}
+
+.optimizer-job-form .primary-action {
+  min-width: 126px;
+  min-height: 40px;
+}
+
+.optimizer-job-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.optimizer-job-card {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  padding: 12px;
+  background: #0b1220;
+}
+
+.optimizer-job-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.optimizer-job-card span,
+.optimizer-job-card small {
+  color: #7c8aa5;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.optimizer-job-card strong {
+  color: #f8fbff;
+  text-transform: uppercase;
+}
+
+.optimizer-job-card p {
+  margin-bottom: 0;
+  color: #fda4af;
+  overflow-wrap: anywhere;
+}
+
 .grant-console {
   display: grid;
   gap: 14px;
@@ -1466,7 +1529,8 @@ select:focus {
   .grant-form,
   .grant-row,
   .housing-form,
-  .inventory-form {
+  .inventory-form,
+  .optimizer-job-form {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -1544,6 +1608,8 @@ select:focus {
   .pipeline-board,
     .deal-intel-grid,
     .optimizer-allocations,
+    .optimizer-job-form,
+    .optimizer-job-grid,
     .qaoa-cost-grid,
     .qaoa-bitstring-row,
     .deadline-row,
