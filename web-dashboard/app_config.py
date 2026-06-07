@@ -27,6 +27,7 @@ class AppSettings(BaseModel):
     dashboard_port: int = Field(default=8787, ge=1, le=65535)
     app_environment: str = "development"
     require_alembic_migrations: bool = False
+    local_demo_mode: bool = False
     stripe_secret_key: SecretStr | None = None
     stripe_webhook_secret: SecretStr | None = None
     stripe_success_url: str = "http://127.0.0.1:5173/?checkout=success"
@@ -114,11 +115,17 @@ def bool_env(name: str, default: str) -> str:
 
 def load_settings_from_env() -> AppSettings:
     try:
+        local_demo_mode = bool_env("REPO52_DEMO_MODE", "false") in {"1", "true", "yes"}
+        database_url = os.environ.get("DATABASE_URL", "").strip()
+        jwt_secret = os.environ.get("JWT_SECRET", "").strip()
+        if local_demo_mode:
+            database_url = database_url or "postgresql://demo:demo@127.0.0.1:5432/repo52_demo"
+            jwt_secret = jwt_secret or "repo52-local-demo-secret-32-characters"
         return AppSettings(
-            database_url=SecretStr(os.environ.get("DATABASE_URL", "").strip()),
+            database_url=SecretStr(database_url),
             database_pool_min=os.environ.get("DATABASE_POOL_MIN", "1"),
             database_pool_max=os.environ.get("DATABASE_POOL_MAX", "10"),
-            jwt_secret=SecretStr(os.environ.get("JWT_SECRET", "").strip()),
+            jwt_secret=SecretStr(jwt_secret),
             jwt_ttl_seconds=os.environ.get("JWT_TTL_SECONDS", "1209600"),
             cookie_secure=bool_env("COOKIE_SECURE", "false") in {"1", "true", "yes"},
             allowed_origins=os.environ.get(
@@ -131,6 +138,7 @@ def load_settings_from_env() -> AppSettings:
             dashboard_port=os.environ.get("DASHBOARD_PORT", "8787"),
             app_environment=os.environ.get("APP_ENV", "development"),
             require_alembic_migrations=bool_env("REQUIRE_ALEMBIC_MIGRATIONS", "false") in {"1", "true", "yes"},
+            local_demo_mode=local_demo_mode,
             stripe_secret_key=SecretStr(os.environ["STRIPE_SECRET_KEY"].strip()) if os.environ.get("STRIPE_SECRET_KEY", "").strip() else None,
             stripe_webhook_secret=SecretStr(os.environ["STRIPE_WEBHOOK_SECRET"].strip()) if os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip() else None,
             stripe_success_url=os.environ.get("STRIPE_SUCCESS_URL", "http://127.0.0.1:5173/?checkout=success"),

@@ -47,6 +47,19 @@ RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 SENSITIVE_LOG_KEYS = {"secret", "password", "token", "key", "database_url", "dsn"}
 STRIPE_CHECKOUT_ENDPOINT = "https://api.stripe.com/v1/checkout/sessions"
 REQUIRED_ALEMBIC_REVISION = "001_initial_enterprise_schema"
+DEMO_LOCK = threading.Lock()
+DEMO_USER = {
+    "id": 1,
+    "email": "angela@data-analytics.local",
+    "display_name": "Angela Demo",
+    "password_hash": "",
+}
+DEMO_DB: dict[str, list[dict]] = {
+    "grants": [],
+    "housing": [],
+    "inventory": [],
+    "transactions": [],
+}
 
 
 def utc_now() -> datetime:
@@ -104,6 +117,10 @@ def cookie_secure() -> bool:
 
 def access_token_max_age() -> int:
     return settings().jwt_ttl_seconds
+
+
+def local_demo_mode() -> bool:
+    return settings().local_demo_mode
 
 
 def init_pool() -> None:
@@ -343,6 +360,354 @@ def require_alembic_schema() -> None:
         raise RuntimeError(
             "Alembic migration check failed. Run `alembic upgrade head` before starting the production server."
         )
+
+
+def next_demo_id(table: str, key: str) -> int:
+    rows = DEMO_DB[table]
+    return max([int(row[key]) for row in rows], default=0) + 1
+
+
+def demo_assets() -> list[dict]:
+    now = utc_now()
+    return [
+        {
+            "ticker": ticker,
+            "name": name,
+            "target_weight": weight,
+            "paper_cash": cash,
+            "expected_return": expected_return,
+            "volatility": volatility,
+            "updated_at": now,
+        }
+        for ticker, name, weight, cash, expected_return, volatility in DEFAULT_ASSETS
+    ]
+
+
+def demo_portfolio_payload() -> dict:
+    assets = demo_assets()
+    summary = summarize_assets(assets)
+    return {
+        "summary": summary,
+        "assets": assets,
+        "history": [
+            {
+                "source": "demo_memory",
+                "total_cash": summary["totalCash"],
+                "weighted_return": summary["weightedReturn"],
+                "weighted_risk": summary["weightedRisk"],
+                "asset_count": summary["assetCount"],
+                "created_at": utc_now(),
+            }
+        ],
+        "telemetry": [
+            {
+                "run_id": "demo-local",
+                "backend": "memory",
+                "metric_name": "weighted_return",
+                "metric_value": summary["weightedReturn"],
+                "created_at": utc_now(),
+            },
+            {
+                "run_id": "demo-local",
+                "backend": "memory",
+                "metric_name": "weighted_risk",
+                "metric_value": summary["weightedRisk"],
+                "created_at": utc_now(),
+            },
+        ],
+    }
+
+
+def seed_demo_memory() -> None:
+    if DEMO_DB["grants"]:
+        return
+
+    grant_rows = [
+        {
+            "grant_name": "Women in Analytics Emergency Scholarship",
+            "funding_amount": 7500.0,
+            "deadline": shift_date(12),
+            "application_difficulty": 2,
+            "status": "ready",
+        },
+        {
+            "grant_name": "Small Business Digital Tools Award",
+            "funding_amount": 12000.0,
+            "deadline": shift_date(28),
+            "application_difficulty": 3,
+            "status": "research",
+        },
+        {
+            "grant_name": "Continuing Education Support Fund",
+            "funding_amount": 4200.0,
+            "deadline": shift_date(6),
+            "application_difficulty": 1,
+            "status": "ready",
+        },
+    ]
+    for index, grant in enumerate(grant_rows, start=1):
+        DEMO_DB["grants"].append(
+            {
+                "id": index,
+                **grant,
+                "priority_score": calculate_grant_priority(
+                    funding_amount=grant["funding_amount"],
+                    deadline=grant["deadline"],
+                    application_difficulty=grant["application_difficulty"],
+                    status=grant["status"],
+                ),
+                "created_at": utc_now(),
+                "updated_at": utc_now(),
+            }
+        )
+
+    DEMO_DB["housing"].extend(
+        [
+            enrich_housing_incident(
+                {
+                    "incident_id": 1,
+                    "category": "Maintenance",
+                    "description": "Water staining spreading under kitchen ceiling vent.",
+                    "area_location": "Kitchen ceiling",
+                    "request_date": shift_date(-9),
+                    "resolve_date": None,
+                    "severity_level": 7,
+                    "status": "requested",
+                    "created_at": utc_now(),
+                    "updated_at": utc_now(),
+                }
+            ),
+            enrich_housing_incident(
+                {
+                    "incident_id": 2,
+                    "category": "Safety",
+                    "description": "Exterior stair light does not turn on after dark.",
+                    "area_location": "Front stairwell",
+                    "request_date": shift_date(-3),
+                    "resolve_date": None,
+                    "severity_level": 8,
+                    "status": "open",
+                    "created_at": utc_now(),
+                    "updated_at": utc_now(),
+                }
+            ),
+        ]
+    )
+
+    DEMO_DB["inventory"].extend(
+        [
+            enrich_inventory_item(
+                {
+                    "item_id": 1,
+                    "item_name": "Nikon Z6 II Camera Kit",
+                    "category": "Camera Gear",
+                    "estimated_market_value": 1450.0,
+                    "quantity": 1,
+                    "notes": "Body, lens, batteries, charger.",
+                    "acquired_at": utc_now(),
+                    "created_at": utc_now(),
+                    "updated_at": utc_now(),
+                }
+            ),
+            enrich_inventory_item(
+                {
+                    "item_id": 2,
+                    "item_name": "Tang Sancai Ceramic Reference Piece",
+                    "category": "Collectibles",
+                    "estimated_market_value": 325.0,
+                    "quantity": 2,
+                    "notes": "Demo catalog example for historical-object tracking.",
+                    "acquired_at": utc_now(),
+                    "created_at": utc_now(),
+                    "updated_at": utc_now(),
+                }
+            ),
+        ]
+    )
+
+    DEMO_DB["transactions"].extend(
+        [
+            demo_transaction(
+                transaction_id=1,
+                stage="listing",
+                address="418 Harbor View Lane",
+                city="Charleston",
+                state="SC",
+                zip_code="29401",
+                price=485000,
+                client="Seller file",
+                escrow="Pending offer",
+                earnest_money=0,
+                closing_offset=42,
+                milestones=[
+                    ("Seller disclosure packet", 2, False, True, "Upload signed disclosure before offer review."),
+                    ("MLS photo review", 4, False, False, "Confirm image order and feature sheet."),
+                    ("Offer review window", 9, False, True, "Calendar seller response deadline."),
+                ],
+            ),
+            demo_transaction(
+                transaction_id=2,
+                stage="under_contract",
+                address="92 Cedar Mill Court",
+                city="Raleigh",
+                state="NC",
+                zip_code="27601",
+                price=612500,
+                client="Buyer file",
+                escrow="Atlantic Title",
+                earnest_money=18500,
+                closing_offset=28,
+                milestones=[
+                    ("Inspection contingency", 1, False, True, "Deposit exposure begins if missed."),
+                    ("Appraisal ordered", 5, False, True, "Confirm lender order and access."),
+                    ("Loan approval deadline", 13, False, True, "Financing condition drop-dead date."),
+                ],
+            ),
+            demo_transaction(
+                transaction_id=3,
+                stage="closing",
+                address="1509 Ridgecrest Avenue",
+                city="Nashville",
+                state="TN",
+                zip_code="37203",
+                price=524900,
+                client="Relocation file",
+                escrow="Keystone Settlement",
+                earnest_money=16000,
+                closing_offset=5,
+                milestones=[
+                    ("Clear to close", 0, False, True, "Confirm final lender status."),
+                    ("Wire instructions verified", 2, False, True, "Call title company before transfer."),
+                    ("Closing appointment", 5, False, True, "Final signature window."),
+                ],
+            ),
+        ]
+    )
+
+
+def demo_transaction(
+    *,
+    transaction_id: int,
+    stage: str,
+    address: str,
+    city: str,
+    state: str,
+    zip_code: str,
+    price: float,
+    client: str,
+    escrow: str,
+    earnest_money: float,
+    closing_offset: int,
+    milestones: list[tuple[str, int, bool, bool, str]],
+) -> dict:
+    shaped_milestones = []
+    for index, (name, offset, completed, critical, notes) in enumerate(milestones, start=1):
+        due_date = shift_date(offset)
+        milestone = {
+            "id": transaction_id * 100 + index,
+            "name": name,
+            "dueDate": due_date,
+            "completed": completed,
+            "completedAt": utc_now() if completed else None,
+            "critical": critical,
+            "notes": notes,
+        }
+        milestone["risk"] = transaction_milestone_risk(
+            {
+                "due_date": due_date,
+                "completed_at": milestone["completedAt"],
+                "is_critical_drop_dead": critical,
+            }
+        )
+        shaped_milestones.append(milestone)
+
+    return {
+        "id": f"TX-{transaction_id}",
+        "transactionId": transaction_id,
+        "listingId": transaction_id,
+        "stage": stage,
+        "address": address,
+        "city": city,
+        "state": state,
+        "zip": zip_code,
+        "price": float(price),
+        "listingPrice": float(price),
+        "agent": DEMO_USER["display_name"],
+        "client": client,
+        "escrow": escrow,
+        "earnestMoney": float(earnest_money),
+        "closingDate": shift_date(closing_offset),
+        "milestones": shaped_milestones,
+    }
+
+
+def demo_grants_payload() -> dict:
+    grants = sorted(
+        DEMO_DB["grants"],
+        key=lambda grant: (-float(grant["priority_score"]), grant["deadline"] or date.max, -float(grant["funding_amount"])),
+    )
+    active_grants = [grant for grant in grants if grant["status"] not in {"denied", "archived"}]
+    return {
+        "summary": {
+            "grantCount": len(grants),
+            "activeGrantCount": len(active_grants),
+            "totalFunding": round(sum(float(grant["funding_amount"]) for grant in active_grants), 2),
+            "topPriorityScore": float(grants[0]["priority_score"]) if grants else 0,
+        },
+        "grants": grants,
+    }
+
+
+def demo_housing_payload() -> dict:
+    incidents = [enrich_housing_incident(incident) for incident in DEMO_DB["housing"]]
+    open_incidents = [item for item in incidents if item["status"] not in {"resolved", "closed"}]
+    overdue_incidents = [item for item in incidents if item["violation_flag"] not in {"resolved", "tracking"}]
+    return {
+        "summary": {
+            "incidentCount": len(incidents),
+            "openIncidentCount": len(open_incidents),
+            "overdueCount": len(overdue_incidents),
+            "maxDaysUnresolved": max([item["days_unresolved"] for item in open_incidents], default=0),
+        },
+        "incidents": incidents,
+    }
+
+
+def demo_inventory_payload() -> dict:
+    items = [enrich_inventory_item(item) for item in DEMO_DB["inventory"]]
+    total_value = sum(float(item["total_estimated_value"]) for item in items)
+    categories = sorted({item["category"] for item in items})
+    return {
+        "summary": {
+            "itemCount": len(items),
+            "categoryCount": len(categories),
+            "totalEstimatedValue": round(total_value, 2),
+            "topItemValue": max([float(item["total_estimated_value"]) for item in items], default=0),
+        },
+        "items": items,
+    }
+
+
+def demo_transactions_payload() -> dict:
+    deals = list(DEMO_DB["transactions"])
+    active_deals = [deal for deal in deals if deal["stage"] != "closed"]
+    all_milestones = [milestone for deal in deals for milestone in deal["milestones"]]
+    due_this_week = [
+        milestone
+        for milestone in all_milestones
+        if not milestone["completed"] and 0 <= (milestone["dueDate"] - date.today()).days <= 7
+    ]
+    breached = [milestone for milestone in all_milestones if milestone.get("risk") == "breach"]
+    return {
+        "summary": {
+            "activeDealCount": len(active_deals),
+            "activeDealValue": round(sum(float(deal["price"]) for deal in active_deals), 2),
+            "earnestExposure": round(sum(float(deal["earnestMoney"]) for deal in active_deals), 2),
+            "deadlineBreachCount": len(breached),
+            "dueThisWeekCount": len(due_this_week),
+        },
+        "deals": deals,
+    }
 
 
 def hash_password(password: str) -> str:
@@ -1349,6 +1714,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_json(HTTPStatus.OK, {"ok": True, "outcome": outcome})
 
     def current_user(self) -> dict | None:
+        if local_demo_mode():
+            return DEMO_USER
         token = self.cookie_token()
         if not token:
             return None
@@ -1405,6 +1772,248 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ValueError:
             return None
 
+    def send_demo_session(self) -> None:
+        self.send_json(
+            HTTPStatus.OK,
+            {"user": {"email": DEMO_USER["email"], "displayName": DEMO_USER["display_name"]}},
+            {"Set-Cookie": access_cookie_header(DEMO_USER)},
+        )
+
+    def handle_demo_get(self, path: str) -> bool:
+        if path == "/api/health":
+            self.send_json(HTTPStatus.OK, {"ok": True, "database": "demo_memory", "auth": "demo_jwt"})
+            return True
+        if path == "/api/me":
+            self.send_json(HTTPStatus.OK, {"user": {"email": DEMO_USER["email"], "displayName": DEMO_USER["display_name"]}})
+            return True
+        if path == "/api/portfolio":
+            self.log_event("demo_portfolio_payload", user_id=DEMO_USER["id"], ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, demo_portfolio_payload())
+            return True
+        if path == "/api/grants":
+            self.log_event("demo_grant_ledger_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["grants"]), ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, demo_grants_payload())
+            return True
+        if path == "/api/housing":
+            self.log_event("demo_housing_incident_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["housing"]), ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, demo_housing_payload())
+            return True
+        if path == "/api/inventory":
+            self.log_event("demo_inventory_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["inventory"]), ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, demo_inventory_payload())
+            return True
+        if path == "/api/transactions":
+            self.log_event("demo_transaction_pipeline_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["transactions"]), ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, demo_transactions_payload())
+            return True
+        return False
+
+    def handle_demo_post(self, path: str, payload: dict) -> bool:
+        if path in {"/api/register", "/api/login"}:
+            self.log_event("demo_login", user_id=DEMO_USER["id"], ip=self.client_ip())
+            self.send_demo_session()
+            return True
+        if path == "/api/logout":
+            self.send_json(HTTPStatus.OK, {"ok": True}, {"Set-Cookie": clear_cookie_header()})
+            return True
+        if path == "/api/stripe/checkout":
+            self.send_json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Stripe Checkout is disabled in local demo mode."})
+            return True
+        if path == "/api/grants":
+            try:
+                values = grant_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return True
+            with DEMO_LOCK:
+                grant = {
+                    "id": next_demo_id("grants", "id"),
+                    **values,
+                    "created_at": utc_now(),
+                    "updated_at": utc_now(),
+                }
+                DEMO_DB["grants"].append(grant)
+            self.send_json(HTTPStatus.CREATED, {"grant": grant})
+            return True
+        if path == "/api/housing":
+            try:
+                values = housing_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return True
+            with DEMO_LOCK:
+                incident = enrich_housing_incident(
+                    {
+                        "incident_id": next_demo_id("housing", "incident_id"),
+                        **values,
+                        "created_at": utc_now(),
+                        "updated_at": utc_now(),
+                    }
+                )
+                DEMO_DB["housing"].append(incident)
+            self.send_json(HTTPStatus.CREATED, {"incident": incident})
+            return True
+        if path == "/api/inventory":
+            try:
+                values = inventory_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return True
+            with DEMO_LOCK:
+                item = enrich_inventory_item(
+                    {
+                        "item_id": next_demo_id("inventory", "item_id"),
+                        **values,
+                        "acquired_at": utc_now(),
+                        "created_at": utc_now(),
+                        "updated_at": utc_now(),
+                    }
+                )
+                DEMO_DB["inventory"].append(item)
+            self.send_json(HTTPStatus.CREATED, {"item": item})
+            return True
+        if path == "/api/transactions":
+            try:
+                values = transaction_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return True
+            with DEMO_LOCK:
+                transaction_id = next_demo_id("transactions", "transactionId")
+                milestones = []
+                for index, (name, due_date, completed_at, critical, notes) in enumerate(values["milestones"], start=1):
+                    milestone = {
+                        "id": transaction_id * 100 + index,
+                        "name": name,
+                        "dueDate": due_date,
+                        "completed": bool(completed_at),
+                        "completedAt": completed_at,
+                        "critical": critical,
+                        "notes": notes,
+                    }
+                    milestone["risk"] = transaction_milestone_risk(
+                        {
+                            "due_date": due_date,
+                            "completed_at": completed_at,
+                            "is_critical_drop_dead": critical,
+                        }
+                    )
+                    milestones.append(milestone)
+                transaction = {
+                    "id": f"TX-{transaction_id}",
+                    "transactionId": transaction_id,
+                    "listingId": transaction_id,
+                    "stage": values["stage"],
+                    "address": values["address_street"],
+                    "city": values["address_city"],
+                    "state": values["address_state"],
+                    "zip": values["address_zip"],
+                    "price": values["price"],
+                    "listingPrice": values["price"],
+                    "agent": DEMO_USER["display_name"],
+                    "client": values["buyer_name"],
+                    "escrow": values["escrow_company"],
+                    "earnestMoney": values["earnest_money"],
+                    "closingDate": values["target_closing_date"],
+                    "milestones": milestones,
+                }
+                DEMO_DB["transactions"].append(transaction)
+            self.send_json(HTTPStatus.CREATED, {"ok": True, "transactionId": transaction_id})
+            return True
+        return False
+
+    def handle_demo_put(self, path: str, payload: dict) -> bool:
+        grant_id = self.grant_id_from_path(path)
+        housing_id = self.housing_id_from_path(path)
+        inventory_id = self.inventory_id_from_path(path)
+        if grant_id is not None:
+            try:
+                values = grant_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return True
+            with DEMO_LOCK:
+                grant = next((item for item in DEMO_DB["grants"] if item["id"] == grant_id), None)
+                if grant:
+                    grant.update(values)
+                    grant["updated_at"] = utc_now()
+            if not grant:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Grant not found"})
+            else:
+                self.send_json(HTTPStatus.OK, {"grant": grant})
+            return True
+        if housing_id is not None:
+            try:
+                values = housing_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return True
+            with DEMO_LOCK:
+                incident = next((item for item in DEMO_DB["housing"] if item["incident_id"] == housing_id), None)
+                if incident:
+                    incident.update(values)
+                    incident["updated_at"] = utc_now()
+                    incident = enrich_housing_incident(incident)
+            if not incident:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Housing incident not found"})
+            else:
+                self.send_json(HTTPStatus.OK, {"incident": incident})
+            return True
+        if inventory_id is not None:
+            try:
+                values = inventory_payload(payload)
+            except ValueError as exc:
+                self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return True
+            with DEMO_LOCK:
+                item = next((row for row in DEMO_DB["inventory"] if row["item_id"] == inventory_id), None)
+                if item:
+                    item.update(values)
+                    item["updated_at"] = utc_now()
+                    item = enrich_inventory_item(item)
+            if not item:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": "Inventory item not found"})
+            else:
+                self.send_json(HTTPStatus.OK, {"item": item})
+            return True
+        return False
+
+    def handle_demo_patch(self, path: str, payload: dict) -> bool:
+        transaction_id = self.transaction_stage_from_path(path)
+        if transaction_id is None:
+            return False
+        stage = clean_transaction_stage(payload.get("stage", "listing"))
+        with DEMO_LOCK:
+            transaction = next((item for item in DEMO_DB["transactions"] if item["transactionId"] == transaction_id), None)
+            if transaction:
+                transaction["stage"] = stage
+        if not transaction:
+            self.send_json(HTTPStatus.NOT_FOUND, {"error": "Transaction not found"})
+        else:
+            self.log_event("demo_transaction_stage_updated", user_id=DEMO_USER["id"], transaction_id=transaction_id, stage=stage, ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, {"ok": True, "transactionId": transaction_id, "stage": stage})
+        return True
+
+    def handle_demo_delete(self, path: str) -> bool:
+        targets = [
+            ("grants", "id", self.grant_id_from_path(path), "Grant not found"),
+            ("housing", "incident_id", self.housing_id_from_path(path), "Housing incident not found"),
+            ("inventory", "item_id", self.inventory_id_from_path(path), "Inventory item not found"),
+        ]
+        for table, key, row_id, message in targets:
+            if row_id is None:
+                continue
+            with DEMO_LOCK:
+                before = len(DEMO_DB[table])
+                DEMO_DB[table] = [row for row in DEMO_DB[table] if row[key] != row_id]
+                deleted = len(DEMO_DB[table]) < before
+            if not deleted:
+                self.send_json(HTTPStatus.NOT_FOUND, {"error": message})
+            else:
+                self.send_json(HTTPStatus.OK, {"ok": True})
+            return True
+        return False
+
     def do_GET(self) -> None:
         if not self.rate_limit():
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
@@ -1412,11 +2021,21 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         path = urlparse(self.path).path
         if path == "/api/health":
-            self.send_json(HTTPStatus.OK, {"ok": True, "database": "postgresql", "auth": "jwt"})
+            self.send_json(
+                HTTPStatus.OK,
+                {
+                    "ok": True,
+                    "database": "demo_memory" if local_demo_mode() else "postgresql",
+                    "auth": "demo_jwt" if local_demo_mode() else "jwt",
+                },
+            )
             return
 
         if path in {"/openapi.json", "/api/openapi.json"}:
             self.send_openapi_spec()
+            return
+
+        if local_demo_mode() and self.handle_demo_get(path):
             return
 
         if path == "/api/me":
@@ -1671,6 +2290,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
 
         payload = self.read_json()
+        if local_demo_mode() and self.handle_demo_post(path, payload):
+            return
 
         if path == "/api/register":
             email = str(payload.get("email", "")).strip().lower()
@@ -1911,6 +2532,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         grant_id = self.grant_id_from_path(path)
         housing_id = self.housing_id_from_path(path)
         inventory_id = self.inventory_id_from_path(path)
+        payload = self.read_json()
+        if local_demo_mode() and self.handle_demo_put(path, payload):
+            return
         if grant_id is None and housing_id is None and inventory_id is None:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
             return
@@ -1920,7 +2544,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
         if inventory_id is not None:
             try:
-                values = inventory_payload(self.read_json())
+                values = inventory_payload(payload)
             except ValueError as exc:
                 self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
@@ -1959,7 +2583,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         if housing_id is not None:
             try:
-                values = housing_payload(self.read_json())
+                values = housing_payload(payload)
             except ValueError as exc:
                 self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
@@ -2001,7 +2625,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            values = grant_payload(self.read_json())
+            values = grant_payload(payload)
         except ValueError as exc:
             self.send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
@@ -2046,6 +2670,10 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
 
         path = urlparse(self.path).path
+        payload = self.read_json()
+        if local_demo_mode() and self.handle_demo_patch(path, payload):
+            return
+
         transaction_id = self.transaction_stage_from_path(path)
         if transaction_id is None:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
@@ -2055,7 +2683,6 @@ class ApiHandler(BaseHTTPRequestHandler):
         if not user:
             return
 
-        payload = self.read_json()
         stage = clean_transaction_stage(payload.get("stage", "listing"))
         try:
             with db_cursor(commit=True) as cursor:
@@ -2103,6 +2730,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             return
 
         path = urlparse(self.path).path
+        if local_demo_mode() and self.handle_demo_delete(path):
+            return
+
         grant_id = self.grant_id_from_path(path)
         housing_id = self.housing_id_from_path(path)
         inventory_id = self.inventory_id_from_path(path)
@@ -2165,16 +2795,31 @@ class ApiHandler(BaseHTTPRequestHandler):
 def main() -> None:
     load_dotenv_file()
     config = load_app_settings()
-    init_pool()
-    if config.app_environment == "production" or config.require_alembic_migrations:
-        require_alembic_schema()
-        schema_mode = "alembic_only"
+    if config.local_demo_mode and config.app_environment == "production":
+        raise RuntimeError("REPO52_DEMO_MODE cannot be enabled when APP_ENV=production.")
+
+    if config.local_demo_mode:
+        seed_demo_memory()
+        schema_mode = "demo_memory"
     else:
-        init_db()
-        schema_mode = "startup_initializer"
+        init_pool()
+        if config.app_environment == "production" or config.require_alembic_migrations:
+            require_alembic_schema()
+            schema_mode = "alembic_only"
+        else:
+            init_db()
+            schema_mode = "startup_initializer"
+
     host = config.dashboard_host
     port = config.dashboard_port
-    log_event("api_started", host=host, port=port, database="postgresql", auth="jwt", schema_mode=schema_mode)
+    log_event(
+        "api_started",
+        host=host,
+        port=port,
+        database="demo_memory" if config.local_demo_mode else "postgresql",
+        auth="demo_jwt" if config.local_demo_mode else "jwt",
+        schema_mode=schema_mode,
+    )
     ThreadingHTTPServer((host, port), ApiHandler).serve_forever()
 
 

@@ -17,6 +17,31 @@ This log records the build history for Repo 52 in plain operational language. It
 
 ## Release Ledger
 
+### Current release - Add local demo mode for desktop launcher
+
+Status: verified locally, pending push
+
+Added a safe local demo mode:
+
+- New `REPO52_DEMO_MODE` Pydantic config flag.
+- Demo mode supplies safe default `DATABASE_URL` and `JWT_SECRET` only when local demo is explicitly enabled.
+- Backend skips PostgreSQL pool initialization in demo mode.
+- Production rejects demo mode when `APP_ENV=production`.
+- Thread-safe in-memory demo data for portfolio, grants, housing, inventory, and transaction pipeline routes.
+- Demo CRUD handlers for grants, housing incidents, inventory items, transaction creation, and transaction drag/drop stage updates.
+- Demo auth handler returns a local demo user so the dashboard opens immediately.
+- Desktop launcher now sets `REPO52_DEMO_MODE=true`, `APP_ENV=development`, and `REQUIRE_ALEMBIC_MIGRATIONS=false`.
+- README documents demo mode as non-persistent local preview behavior.
+
+Verification:
+
+- `py -3.11 -m py_compile app_config.py server.py seed_transactions.py alembic\env.py alembic\versions\001_initial_enterprise_schema.py` passed.
+- `npm run build` passed.
+- Demo payload smoke test serialized portfolio, grants, housing, inventory, and transactions successfully.
+- Demo startup smoke test reached `api_started` with `database=demo_memory` and `schema_mode=demo_memory` without opening a PostgreSQL socket.
+- Production guard smoke test rejected `REPO52_DEMO_MODE=true` when `APP_ENV=production`.
+- `git diff --check` passed.
+
 ### Current release - Add billing UI, chunk splitting, and Alembic-only production boot
 
 Status: verified locally, pending push

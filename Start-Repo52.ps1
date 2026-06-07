@@ -26,8 +26,12 @@ $BackendCommand = @"
 Set-Location -LiteralPath '$DashboardRoot'
 Write-Host ''
 Write-Host 'Repo 52 backend starting on http://127.0.0.1:8787' -ForegroundColor Cyan
+Write-Host 'Local demo mode is enabled so PostgreSQL is not required for this shortcut.' -ForegroundColor Yellow
 Write-Host 'Leave this window open while using the dashboard.' -ForegroundColor Yellow
 Write-Host ''
+`$env:REPO52_DEMO_MODE = 'true'
+`$env:APP_ENV = 'development'
+`$env:REQUIRE_ALEMBIC_MIGRATIONS = 'false'
 py -3.11 server.py
 "@
 

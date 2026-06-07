@@ -89,6 +89,18 @@ RATE_LIMIT_API_PER_MINUTE=120
 
 The backend validates runtime configuration through `web-dashboard/app_config.py` using Pydantic. Database URLs and JWT secrets are stored as secret fields, redacted in normal representation, and rejected early if required values are missing or malformed.
 
+### Local Demo Shortcut
+
+The desktop shortcut and `Start-Repo52.ps1` start the backend with:
+
+```text
+REPO52_DEMO_MODE=true
+APP_ENV=development
+REQUIRE_ALEMBIC_MIGRATIONS=false
+```
+
+That mode skips the PostgreSQL socket connection and serves thread-safe in-memory demo data for portfolio, grants, housing, inventory, and real estate transactions. It is for local dashboard preview only; it does not persist changes after the backend window closes. `server.py` rejects demo mode when `APP_ENV=production`.
+
 ## Stripe Webhooks
 
 Set Stripe billing secrets before enabling subscription billing:
