@@ -71,6 +71,7 @@ DEMO_TABLES = {
     "transactions": ("demo_transactions", "transactionId"),
     "optimizer_runs": ("demo_optimizer_runs", "run_id"),
 }
+DEMO_CORE_TABLES = ("grants", "housing", "inventory", "transactions")
 
 
 def utc_now() -> datetime:
@@ -451,7 +452,8 @@ def save_demo_memory_to_sqlite() -> None:
     init_demo_sqlite()
     with DEMO_LOCK:
         with sqlite3.connect(DEMO_SQLITE_FILE) as connection:
-            for logical_name, (table_name, key_name) in DEMO_TABLES.items():
+            for logical_name in DEMO_CORE_TABLES:
+                table_name, key_name = DEMO_TABLES[logical_name]
                 connection.execute(f"DELETE FROM {table_name}")
                 rows = [
                     (int(row[key_name]), json.dumps(row, default=str))
@@ -521,7 +523,7 @@ def demo_portfolio_payload() -> dict:
 def seed_demo_memory() -> None:
     init_demo_sqlite()
     load_demo_memory_from_sqlite()
-    if any(DEMO_DB[table] for table in DEMO_DB):
+    if any(DEMO_DB[table] for table in DEMO_CORE_TABLES):
         log_event(
             "demo_sqlite_loaded",
             database=str(DEMO_SQLITE_FILE),
