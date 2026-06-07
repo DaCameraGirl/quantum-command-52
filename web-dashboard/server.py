@@ -62,12 +62,14 @@ DEMO_DB: dict[str, list[dict]] = {
     "housing": [],
     "inventory": [],
     "transactions": [],
+    "optimizer_runs": [],
 }
 DEMO_TABLES = {
     "grants": ("demo_grants", "id"),
     "housing": ("demo_housing", "incident_id"),
     "inventory": ("demo_inventory", "item_id"),
     "transactions": ("demo_transactions", "transactionId"),
+    "optimizer_runs": ("demo_optimizer_runs", "run_id"),
 }
 
 
@@ -527,6 +529,7 @@ def seed_demo_memory() -> None:
             housing=len(DEMO_DB["housing"]),
             inventory=len(DEMO_DB["inventory"]),
             transactions=len(DEMO_DB["transactions"]),
+            optimizer_runs=len(DEMO_DB["optimizer_runs"]),
         )
         return
 
@@ -699,6 +702,7 @@ def seed_demo_memory() -> None:
         housing=len(DEMO_DB["housing"]),
         inventory=len(DEMO_DB["inventory"]),
         transactions=len(DEMO_DB["transactions"]),
+        optimizer_runs=len(DEMO_DB["optimizer_runs"]),
     )
 
 
@@ -824,6 +828,20 @@ def demo_transactions_payload() -> dict:
             "dueThisWeekCount": len(due_this_week),
         },
         "deals": deals,
+    }
+
+
+def demo_optimizer_runs_payload() -> dict:
+    runs = sorted(DEMO_DB["optimizer_runs"], key=lambda run: int(run.get("run_id", 0)), reverse=True)
+    latest = runs[0] if runs else None
+    return {
+        "summary": {
+            "runCount": len(runs),
+            "latestMatchedExact": bool(latest.get("matchedExact")) if latest else False,
+            "latestCostGap": round(float(latest.get("costGap", 0)), 6) if latest else 0,
+        },
+        "latest": latest,
+        "runs": runs[:10],
     }
 
 
@@ -2011,6 +2029,11 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/api/transactions":
             self.log_event("demo_transaction_pipeline_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["transactions"]), ip=self.client_ip())
             self.send_json(HTTPStatus.OK, demo_transactions_payload())
+            return True
+        if path == "/api/optimizer/runs":
+            load_demo_memory_from_sqlite()
+            self.log_event("demo_optimizer_run_list", user_id=DEMO_USER["id"], count=len(DEMO_DB["optimizer_runs"]), ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, demo_optimizer_runs_payload())
             return True
         return False
 

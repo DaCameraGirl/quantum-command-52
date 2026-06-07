@@ -642,6 +642,94 @@ select:focus {
   font-weight: 900;
 }
 
+.ghost-button.compact {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 0.82rem;
+}
+
+.qaoa-results-panel {
+  align-content: start;
+}
+
+.qaoa-result-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.qaoa-result-summary,
+.qaoa-cost-grid,
+.qaoa-bitstrings,
+.empty-panel {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  padding: 12px;
+  background: #0b1220;
+}
+
+.qaoa-result-summary {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.qaoa-result-summary span,
+.qaoa-cost-grid span,
+.qaoa-bitstring-row span,
+.qaoa-bitstring-row small {
+  color: #7c8aa5;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.qaoa-result-summary strong,
+.qaoa-cost-grid strong,
+.qaoa-bitstring-row strong {
+  color: #f8fbff;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.qaoa-result-summary small,
+.empty-panel {
+  color: #9fb2ca;
+  line-height: 1.5;
+}
+
+.qaoa-cost-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.qaoa-cost-grid div {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  padding: 9px;
+  background: #050a12;
+}
+
+.qaoa-bitstrings {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 7px;
+}
+
+.qaoa-bitstring-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(56, 189, 248, 0.12);
+  border-radius: 7px;
+  padding: 9px;
+  background: #050a12;
+}
+
 .grant-console {
   display: grid;
   gap: 14px;
@@ -1394,11 +1482,13 @@ select:focus {
   .deal-intel-grid,
   .billing-layout,
   .billing-plans,
-  .optimizer-layout {
+  .optimizer-layout,
+  .qaoa-result-layout {
     grid-template-columns: 1fr;
   }
 
-  .optimizer-allocations {
+  .optimizer-allocations,
+  .qaoa-cost-grid {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -1454,6 +1544,8 @@ select:focus {
   .pipeline-board,
     .deal-intel-grid,
     .optimizer-allocations,
+    .qaoa-cost-grid,
+    .qaoa-bitstring-row,
     .deadline-row,
     .timeline-main {
     grid-template-columns: 1fr;

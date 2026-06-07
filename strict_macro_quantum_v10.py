@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import sqlite3
 import sys
+import time
 from pathlib import Path
 
 
@@ -67,6 +70,7 @@ ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT / "output"
 WORKBOOK = OUTPUT_DIR / "ANGELAS_QUANTUM_EMPIRE_V10.xlsx"
 ENV_FILE = ROOT / ".env"
+DEMO_SQLITE_FILE = ROOT / "web-dashboard" / "data.db"
 console = Console()
 
 
@@ -460,6 +464,30 @@ def write_hybrid_optimizer_ledger(
     return path
 
 
+def persist_optimizer_run_to_demo_sqlite(payload: dict[str, object]) -> None:
+    DEMO_SQLITE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DEMO_SQLITE_FILE) as connection:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS demo_optimizer_runs (
+                run_id INTEGER PRIMARY KEY,
+                payload_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT OR REPLACE INTO demo_optimizer_runs (run_id, payload_json, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            """,
+            (int(payload["run_id"]), json.dumps(payload, default=str)),
+        )
+        connection.commit()
+    console.print(f"[bold green]QAOA run saved to dashboard SQLite: {DEMO_SQLITE_FILE}[/bold green]")
+
+
 def preflight() -> None:
     if not ENV_FILE.exists():
         fail(f"Missing .env file at {ENV_FILE}")
@@ -530,7 +558,7 @@ def main() -> None:
     if args.optimizer_mode == "classical":
         returns, volatilities, prices = fetch_market_metrics(assets, args.period)
         weights, convergence = classical_optimizer_weights(returns, volatilities)
-        write_hybrid_optimizer_ledger(
+        workbook_path = write_hybrid_optimizer_ledger(
             mode=args.optimizer_mode,
             assets=assets,
             bankroll=args.bankroll,
@@ -577,6 +605,30 @@ def main() -> None:
             prices=prices,
             convergence=convergence,
         )
+        run_payload = {
+            "run_id": int(time.time() * 1000),
+            "mode": "qaoa",
+            "assets": assets,
+            "budget": budget,
+            "reps": args.qaoa_reps,
+            "maxiter": args.qaoa_maxiter,
+            "shots": args.qaoa_shots,
+            "qaoaBits": result.qaoa_bits,
+            "exactBits": result.exact_bits,
+            "matchedExact": result.matched_exact,
+            "selectedTickers": result.selected_tickers,
+            "qaoaCost": round(result.qaoa_cost, 8),
+            "exactCost": round(result.exact_cost, 8),
+            "costGap": round(abs(result.qaoa_cost - result.exact_cost), 8),
+            "optimizerEnergy": round(result.optimizer_energy, 8),
+            "topCounts": [
+                {"bits": bits, "shots": count, "probability": round(count / args.qaoa_shots, 6)}
+                for bits, count in top_counts
+            ],
+            "workbook": str(workbook_path),
+            "createdAt": pd.Timestamp.utcnow().isoformat(),
+        }
+        persist_optimizer_run_to_demo_sqlite(run_payload)
         console.print(f"[cyan]QAOA bits:[/cyan] {result.qaoa_bits} -> {result.selected_tickers}")
         console.print(f"[cyan]Exact bits:[/cyan] {result.exact_bits}")
         console.print(f"[cyan]Matched exact optimum:[/cyan] {result.matched_exact}")

@@ -1393,6 +1393,8 @@ function Dashboard({ user, onLogout }) {
   const [optimizerMode, setOptimizerMode] = useState("classical");
   const [optimizerData, setOptimizerData] = useState(null);
   const [optimizerError, setOptimizerError] = useState("");
+  const [optimizerRuns, setOptimizerRuns] = useState(null);
+  const [optimizerRunsError, setOptimizerRunsError] = useState("");
 
   useEffect(() => {
     api("/api/portfolio").then(setData).catch((err) => setError(err.message));
@@ -1412,6 +1414,20 @@ function Dashboard({ user, onLogout }) {
       active = false;
     };
   }, [optimizerMode]);
+
+  async function loadOptimizerRuns() {
+    setOptimizerRunsError("");
+    try {
+      const payload = await api("/api/optimizer/runs");
+      setOptimizerRuns(payload);
+    } catch (err) {
+      setOptimizerRunsError(err.message);
+    }
+  }
+
+  useEffect(() => {
+    loadOptimizerRuns();
+  }, []);
 
   const assets = data?.assets || [];
   const summary = data?.summary || {};
@@ -1455,6 +1471,8 @@ function Dashboard({ user, onLogout }) {
     { gate: "IBM runtime instance", owner: "Quantum", status: "Ready" },
     { gate: "Rate-limit shield", owner: "Gateway", status: "Pass" },
   ];
+
+  const latestQaoaRun = optimizerRuns?.latest || null;
 
   return (
     <main className="command-shell">
@@ -1647,6 +1665,62 @@ function Dashboard({ user, onLogout }) {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="control-panel span-2 qaoa-results-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">QAOA results archive</p>
+                        <h2>Latest Statevector Run</h2>
+                      </div>
+                      <button className="ghost-button compact" onClick={loadOptimizerRuns} type="button">
+                        <RefreshCw size={15} /> Refresh
+                      </button>
+                    </div>
+                    {optimizerRunsError && <div className="error-line">{optimizerRunsError}</div>}
+                    {latestQaoaRun ? (
+                      <div className="qaoa-result-layout">
+                        <div className="qaoa-result-summary">
+                          <span>Run {latestQaoaRun.run_id}</span>
+                          <strong>{latestQaoaRun.qaoaBits} / {latestQaoaRun.exactBits}</strong>
+                          <small>QAOA pick vs exact pick</small>
+                          <StatusPill status={latestQaoaRun.matchedExact ? "Pass" : "Watch"} />
+                        </div>
+                        <div className="qaoa-result-summary">
+                          <span>Selected assets</span>
+                          <strong>{(latestQaoaRun.selectedTickers || []).join(", ") || "None"}</strong>
+                          <small>Budget {latestQaoaRun.budget} | reps {latestQaoaRun.reps} | shots {latestQaoaRun.shots}</small>
+                          <StatusPill status={Number(latestQaoaRun.costGap || 0) === 0 ? "Ready" : "Watch"} />
+                        </div>
+                        <div className="qaoa-cost-grid">
+                          <div>
+                            <span>QAOA cost</span>
+                            <strong>{Number(latestQaoaRun.qaoaCost).toFixed(4)}</strong>
+                          </div>
+                          <div>
+                            <span>Exact cost</span>
+                            <strong>{Number(latestQaoaRun.exactCost).toFixed(4)}</strong>
+                          </div>
+                          <div>
+                            <span>Gap</span>
+                            <strong>{Number(latestQaoaRun.costGap).toFixed(6)}</strong>
+                          </div>
+                        </div>
+                        <div className="qaoa-bitstrings">
+                          {(latestQaoaRun.topCounts || []).slice(0, 6).map((item) => (
+                            <div className="qaoa-bitstring-row" key={item.bits}>
+                              <span>{item.bits}</span>
+                              <strong>{item.shots} shots</strong>
+                              <small>{(Number(item.probability) * 100).toFixed(2)}%</small>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="empty-panel">
+                        Run <code>py -3.11 strict_macro_quantum_v10.py --optimizer-mode qaoa</code> to save the first QAOA result into the dashboard archive.
                       </div>
                     )}
                   </div>

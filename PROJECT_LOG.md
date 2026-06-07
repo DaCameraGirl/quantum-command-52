@@ -34,6 +34,8 @@ Added the Sprint 1 and Sprint 2 foundation:
 - Added `qaoa_portfolio_optimizer.py` as a real QUBO-to-Ising QAOA portfolio-selection artifact.
 - QAOA mode builds a portfolio QUBO, maps it to a `SparsePauliOp` Ising Hamiltonian, runs `QAOAAnsatz` with statevector primitives, samples the optimized circuit, and compares against brute force.
 - Classical mode writes a practical risk-adjusted paper ledger; QAOA mode writes a statevector QAOA workbook and prints the exact-optimum match check.
+- QAOA mode now persists each completed run into the local dashboard SQLite archive.
+- Macro dashboard now displays the latest saved QAOA run, including QAOA bits, exact bits, selected assets, cost gap, and top sampled bitstrings.
 
 Verification:
 
@@ -43,6 +45,7 @@ Verification:
 - SQLite reload smoke test loaded persisted rows from `data.db` without reseeding.
 - `/api/optimizer` payload smoke test returned the quantum mode payload successfully.
 - `py -3.11 qaoa_portfolio_optimizer.py` matched the brute-force optimum on the local QAOA demo.
+- Dashboard build includes the QAOA results archive panel and refresh control.
 - `.gitignore` already excludes `web-dashboard/*.db` and `web-dashboard/*.db-*`.
 
 ### Current release - Add local demo mode for desktop launcher
