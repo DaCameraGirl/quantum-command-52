@@ -1390,10 +1390,28 @@ function Dashboard({ user, onLogout }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("macro");
+  const [optimizerMode, setOptimizerMode] = useState("classical");
+  const [optimizerData, setOptimizerData] = useState(null);
+  const [optimizerError, setOptimizerError] = useState("");
 
   useEffect(() => {
     api("/api/portfolio").then(setData).catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    setOptimizerError("");
+    api(`/api/optimizer?mode=${optimizerMode}`)
+      .then((payload) => {
+        if (active) setOptimizerData(payload);
+      })
+      .catch((err) => {
+        if (active) setOptimizerError(err.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [optimizerMode]);
 
   const assets = data?.assets || [];
   const summary = data?.summary || {};
@@ -1563,6 +1581,73 @@ function Dashboard({ user, onLogout }) {
                         <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} formatter={(value) => `$${Number(value).toFixed(2)}`} />
                       </RePieChart>
                     </ResponsiveContainer>
+                  </div>
+
+                  <div className="control-panel span-2 optimizer-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Hybrid optimizer</p>
+                        <h2>Classical Solver / Quantum QAOA Comparator</h2>
+                      </div>
+                      <CircuitBoard size={18} />
+                    </div>
+                    <div className="optimizer-toolbar">
+                      <div className="segmented optimizer-toggle">
+                        <button className={optimizerMode === "classical" ? "active" : ""} onClick={() => setOptimizerMode("classical")} type="button">
+                          <Gauge size={16} /> Classical
+                        </button>
+                        <button className={optimizerMode === "quantum" ? "active" : ""} onClick={() => setOptimizerMode("quantum")} type="button">
+                          <CircuitBoard size={16} /> Quantum QAOA
+                        </button>
+                      </div>
+                      <StatusPill status={optimizerMode === "quantum" ? "Watch" : "Pass"} />
+                    </div>
+                    {optimizerError && <div className="error-line">{optimizerError}</div>}
+                    {optimizerData && (
+                      <div className="optimizer-layout">
+                        <div className="optimizer-summary">
+                          <span>{optimizerData.backend}</span>
+                          <h3>{optimizerData.label}</h3>
+                          <p>{optimizerData.description}</p>
+                          <div className="optimizer-metrics">
+                            <div>
+                              <small>Paper return</small>
+                              <strong>{(optimizerData.summary.expectedReturn * 100).toFixed(2)}%</strong>
+                            </div>
+                            <div>
+                              <small>Risk</small>
+                              <strong>{(optimizerData.summary.risk * 100).toFixed(2)}%</strong>
+                            </div>
+                            <div>
+                              <small>Score</small>
+                              <strong>{optimizerData.summary.score.toFixed(2)}</strong>
+                            </div>
+                          </div>
+                          <small className="advice-boundary">{optimizerData.summary.adviceBoundary}</small>
+                        </div>
+                        <div className="optimizer-chart">
+                          <ResponsiveContainer width="100%" height={190}>
+                            <AreaChart data={optimizerData.convergence}>
+                              <CartesianGrid stroke="#263244" strokeDasharray="3 5" vertical={false} />
+                              <XAxis dataKey="cycle" stroke="#7c8aa5" />
+                              <YAxis stroke="#7c8aa5" />
+                              <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
+                              <Area type="monotone" dataKey="score" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.18} strokeWidth={3} />
+                              <Area type="monotone" dataKey="loss" stroke="#f97316" fill="#f97316" fillOpacity={0.12} strokeWidth={2} />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="optimizer-allocations">
+                          {optimizerData.allocations.map((allocation) => (
+                            <div className="optimizer-allocation" key={allocation.ticker}>
+                              <strong>{allocation.ticker}</strong>
+                              <span>{(allocation.weight * 100).toFixed(2)}%</span>
+                              <small>${allocation.paperCapital.toLocaleString(undefined, { maximumFractionDigits: 0 })}</small>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="control-panel">

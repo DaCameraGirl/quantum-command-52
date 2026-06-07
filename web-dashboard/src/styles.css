@@ -524,6 +524,112 @@ select:focus {
   color: #7dd3fc;
 }
 
+.optimizer-panel {
+  align-content: start;
+}
+
+.optimizer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.optimizer-toggle {
+  width: min(420px, 100%);
+}
+
+.optimizer-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.optimizer-summary,
+.optimizer-chart,
+.optimizer-allocations {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  padding: 12px;
+  background: #0b1220;
+}
+
+.optimizer-summary h3 {
+  margin: 0 0 8px;
+  color: #f8fbff;
+  font-size: 1rem;
+}
+
+.optimizer-summary p {
+  margin-bottom: 12px;
+  color: #9fb2ca;
+  line-height: 1.5;
+}
+
+.optimizer-summary span,
+.optimizer-summary small,
+.optimizer-allocation small {
+  color: #7c8aa5;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.optimizer-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.optimizer-metrics div {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  padding: 9px;
+  background: #050a12;
+}
+
+.optimizer-metrics strong {
+  display: block;
+  margin-top: 4px;
+  color: #f8fbff;
+  font-size: 1.05rem;
+}
+
+.advice-boundary {
+  display: block;
+  color: #fdba74 !important;
+  text-transform: none !important;
+}
+
+.optimizer-allocations {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.optimizer-allocation {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.14);
+  border-radius: 7px;
+  padding: 10px;
+  background: #050a12;
+}
+
+.optimizer-allocation strong {
+  color: #38bdf8;
+}
+
+.optimizer-allocation span {
+  color: #f8fbff;
+  font-size: 1.15rem;
+  font-weight: 900;
+}
+
 .grant-console {
   display: grid;
   gap: 14px;
@@ -1275,8 +1381,13 @@ select:focus {
 
   .deal-intel-grid,
   .billing-layout,
-  .billing-plans {
+  .billing-plans,
+  .optimizer-layout {
     grid-template-columns: 1fr;
+  }
+
+  .optimizer-allocations {
+    grid-template-columns: 1fr 1fr;
   }
 
   .grant-row-head {
@@ -1329,9 +1440,19 @@ select:focus {
   .inventory-form,
   .inventory-grid,
   .pipeline-board,
-  .deal-intel-grid,
-  .deadline-row,
-  .timeline-main {
+    .deal-intel-grid,
+    .optimizer-allocations,
+    .deadline-row,
+    .timeline-main {
+    grid-template-columns: 1fr;
+  }
+
+  .optimizer-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .optimizer-metrics {
     grid-template-columns: 1fr;
   }
 

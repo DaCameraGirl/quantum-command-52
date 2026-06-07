@@ -4,9 +4,11 @@ import csv
 import hashlib
 import hmac
 import json
+import math
 import mimetypes
 import os
 import secrets
+import sqlite3
 import threading
 import time
 import uuid
@@ -17,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Iterator
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 import jwt
@@ -47,7 +49,8 @@ RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 SENSITIVE_LOG_KEYS = {"secret", "password", "token", "key", "database_url", "dsn"}
 STRIPE_CHECKOUT_ENDPOINT = "https://api.stripe.com/v1/checkout/sessions"
 REQUIRED_ALEMBIC_REVISION = "001_initial_enterprise_schema"
-DEMO_LOCK = threading.Lock()
+DEMO_SQLITE_FILE = ROOT / "data.db"
+DEMO_LOCK = threading.RLock()
 DEMO_USER = {
     "id": 1,
     "email": "angela@data-analytics.local",
@@ -59,6 +62,12 @@ DEMO_DB: dict[str, list[dict]] = {
     "housing": [],
     "inventory": [],
     "transactions": [],
+}
+DEMO_TABLES = {
+    "grants": ("demo_grants", "id"),
+    "housing": ("demo_housing", "incident_id"),
+    "inventory": ("demo_inventory", "item_id"),
+    "transactions": ("demo_transactions", "transactionId"),
 }
 
 
@@ -367,6 +376,95 @@ def next_demo_id(table: str, key: str) -> int:
     return max([int(row[key]) for row in rows], default=0) + 1
 
 
+def parse_demo_date(value):
+    if value in {None, ""}:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    return datetime.strptime(text[:10], "%Y-%m-%d").date()
+
+
+def normalize_demo_row(table: str, row: dict) -> dict:
+    if table == "grants":
+        row["deadline"] = parse_demo_date(row.get("deadline"))
+    elif table == "housing":
+        row["request_date"] = parse_demo_date(row.get("request_date"))
+        row["resolve_date"] = parse_demo_date(row.get("resolve_date"))
+        row = enrich_housing_incident(row)
+    elif table == "inventory":
+        row = enrich_inventory_item(row)
+    elif table == "transactions":
+        row["closingDate"] = parse_demo_date(row.get("closingDate"))
+        for milestone in row.get("milestones", []):
+            milestone["dueDate"] = parse_demo_date(milestone.get("dueDate"))
+            milestone["risk"] = transaction_milestone_risk(
+                {
+                    "due_date": milestone["dueDate"],
+                    "completed_at": milestone.get("completedAt"),
+                    "is_critical_drop_dead": milestone.get("critical", True),
+                }
+            )
+    return row
+
+
+def init_demo_sqlite() -> None:
+    DEMO_SQLITE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DEMO_SQLITE_FILE) as connection:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA foreign_keys=ON")
+        for table_name, key_name in DEMO_TABLES.values():
+            connection.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {table_name} (
+                    {key_name} INTEGER PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        connection.commit()
+
+
+def load_demo_memory_from_sqlite() -> None:
+    with DEMO_LOCK:
+        for table in DEMO_DB:
+            DEMO_DB[table] = []
+        with sqlite3.connect(DEMO_SQLITE_FILE) as connection:
+            for logical_name, (table_name, key_name) in DEMO_TABLES.items():
+                rows = connection.execute(
+                    f"SELECT {key_name}, payload_json FROM {table_name} ORDER BY {key_name}"
+                ).fetchall()
+                DEMO_DB[logical_name] = [
+                    normalize_demo_row(logical_name, json.loads(payload_json))
+                    for _, payload_json in rows
+                ]
+
+
+def save_demo_memory_to_sqlite() -> None:
+    init_demo_sqlite()
+    with DEMO_LOCK:
+        with sqlite3.connect(DEMO_SQLITE_FILE) as connection:
+            for logical_name, (table_name, key_name) in DEMO_TABLES.items():
+                connection.execute(f"DELETE FROM {table_name}")
+                rows = [
+                    (int(row[key_name]), json.dumps(row, default=str))
+                    for row in DEMO_DB[logical_name]
+                ]
+                connection.executemany(
+                    f"""
+                    INSERT INTO {table_name} ({key_name}, payload_json, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                    """,
+                    rows,
+                )
+            connection.commit()
+
+
 def demo_assets() -> list[dict]:
     now = utc_now()
     return [
@@ -391,7 +489,7 @@ def demo_portfolio_payload() -> dict:
         "assets": assets,
         "history": [
             {
-                "source": "demo_memory",
+                "source": "demo_sqlite",
                 "total_cash": summary["totalCash"],
                 "weighted_return": summary["weightedReturn"],
                 "weighted_risk": summary["weightedRisk"],
@@ -419,7 +517,17 @@ def demo_portfolio_payload() -> dict:
 
 
 def seed_demo_memory() -> None:
-    if DEMO_DB["grants"]:
+    init_demo_sqlite()
+    load_demo_memory_from_sqlite()
+    if any(DEMO_DB[table] for table in DEMO_DB):
+        log_event(
+            "demo_sqlite_loaded",
+            database=str(DEMO_SQLITE_FILE),
+            grants=len(DEMO_DB["grants"]),
+            housing=len(DEMO_DB["housing"]),
+            inventory=len(DEMO_DB["inventory"]),
+            transactions=len(DEMO_DB["transactions"]),
+        )
         return
 
     grant_rows = [
@@ -583,6 +691,15 @@ def seed_demo_memory() -> None:
             ),
         ]
     )
+    save_demo_memory_to_sqlite()
+    log_event(
+        "demo_sqlite_seeded",
+        database=str(DEMO_SQLITE_FILE),
+        grants=len(DEMO_DB["grants"]),
+        housing=len(DEMO_DB["housing"]),
+        inventory=len(DEMO_DB["inventory"]),
+        transactions=len(DEMO_DB["transactions"]),
+    )
 
 
 def demo_transaction(
@@ -707,6 +824,92 @@ def demo_transactions_payload() -> dict:
             "dueThisWeekCount": len(due_this_week),
         },
         "deals": deals,
+    }
+
+
+def normalized_weights(raw_scores: list[float]) -> list[float]:
+    scores = [max(float(score), 0.001) for score in raw_scores]
+    total = sum(scores) or 1.0
+    return [score / total for score in scores]
+
+
+def optimizer_payload(mode: str) -> dict:
+    normalized_mode = str(mode or "classical").strip().lower()
+    if normalized_mode not in {"classical", "quantum"}:
+        normalized_mode = "classical"
+
+    source_assets = [
+        {
+            "ticker": ticker,
+            "name": name,
+            "expected_return": expected_return,
+            "volatility": volatility,
+        }
+        for ticker, name, _weight, _cash, expected_return, volatility in DEFAULT_ASSETS
+    ]
+
+    if normalized_mode == "classical":
+        raw_scores = [
+            asset["expected_return"] / (asset["volatility"] + 0.08)
+            for asset in source_assets
+        ]
+        label = "Classical risk-adjusted solver"
+        backend = "local scipy-style paper solver"
+        description = "Deterministic Sharpe-style scoring for practical paper allocation analysis."
+        convergence = [
+            {"cycle": cycle, "score": round(0.42 + cycle * 0.047, 4), "loss": round(0.58 - cycle * 0.041, 4)}
+            for cycle in range(1, 9)
+        ]
+    else:
+        raw_scores = []
+        for index, asset in enumerate(source_assets):
+            phase = 1.15 + math.sin((index + 1) * 1.618) * 0.22
+            qubo_value = max(asset["expected_return"] - asset["volatility"] * 0.18, 0.01)
+            raw_scores.append(qubo_value * phase)
+        label = "Quantum QAOA research comparator"
+        backend = "local QAOA-style simulator"
+        description = "Maps the allocation target into a small QUBO-style search artifact for presentations."
+        convergence = [
+            {
+                "cycle": cycle,
+                "score": round(0.36 + math.log1p(cycle) * 0.118, 4),
+                "loss": round(0.72 / (cycle + 1), 4),
+            }
+            for cycle in range(1, 9)
+        ]
+
+    weights = normalized_weights(raw_scores)
+    allocations = []
+    for index, asset in enumerate(source_assets):
+        allocation = weights[index]
+        allocations.append(
+            {
+                "ticker": asset["ticker"],
+                "name": asset["name"],
+                "weight": round(allocation, 6),
+                "paperCapital": round(allocation * 500000, 2),
+                "expectedReturn": asset["expected_return"],
+                "volatility": asset["volatility"],
+            }
+        )
+
+    expected_return = sum(item["weight"] * item["expectedReturn"] for item in allocations)
+    risk = sum((item["weight"] * item["volatility"]) ** 2 for item in allocations) ** 0.5
+    score = expected_return / (risk + 1e-6)
+    return {
+        "mode": normalized_mode,
+        "label": label,
+        "backend": backend,
+        "description": description,
+        "summary": {
+            "paperCapital": 500000,
+            "expectedReturn": round(expected_return, 4),
+            "risk": round(risk, 4),
+            "score": round(score, 4),
+            "adviceBoundary": "Paper research output only. Not live trading advice.",
+        },
+        "allocations": allocations,
+        "convergence": convergence,
     }
 
 
@@ -1781,7 +1984,7 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def handle_demo_get(self, path: str) -> bool:
         if path == "/api/health":
-            self.send_json(HTTPStatus.OK, {"ok": True, "database": "demo_memory", "auth": "demo_jwt"})
+            self.send_json(HTTPStatus.OK, {"ok": True, "database": "demo_sqlite", "auth": "demo_jwt"})
             return True
         if path == "/api/me":
             self.send_json(HTTPStatus.OK, {"user": {"email": DEMO_USER["email"], "displayName": DEMO_USER["display_name"]}})
@@ -1833,6 +2036,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "updated_at": utc_now(),
                 }
                 DEMO_DB["grants"].append(grant)
+                save_demo_memory_to_sqlite()
             self.send_json(HTTPStatus.CREATED, {"grant": grant})
             return True
         if path == "/api/housing":
@@ -1851,6 +2055,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     }
                 )
                 DEMO_DB["housing"].append(incident)
+                save_demo_memory_to_sqlite()
             self.send_json(HTTPStatus.CREATED, {"incident": incident})
             return True
         if path == "/api/inventory":
@@ -1870,6 +2075,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     }
                 )
                 DEMO_DB["inventory"].append(item)
+                save_demo_memory_to_sqlite()
             self.send_json(HTTPStatus.CREATED, {"item": item})
             return True
         if path == "/api/transactions":
@@ -1918,6 +2124,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "milestones": milestones,
                 }
                 DEMO_DB["transactions"].append(transaction)
+                save_demo_memory_to_sqlite()
             self.send_json(HTTPStatus.CREATED, {"ok": True, "transactionId": transaction_id})
             return True
         return False
@@ -1937,6 +2144,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 if grant:
                     grant.update(values)
                     grant["updated_at"] = utc_now()
+                    save_demo_memory_to_sqlite()
             if not grant:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Grant not found"})
             else:
@@ -1954,6 +2162,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     incident.update(values)
                     incident["updated_at"] = utc_now()
                     incident = enrich_housing_incident(incident)
+                    save_demo_memory_to_sqlite()
             if not incident:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Housing incident not found"})
             else:
@@ -1971,6 +2180,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                     item.update(values)
                     item["updated_at"] = utc_now()
                     item = enrich_inventory_item(item)
+                    save_demo_memory_to_sqlite()
             if not item:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Inventory item not found"})
             else:
@@ -1987,6 +2197,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             transaction = next((item for item in DEMO_DB["transactions"] if item["transactionId"] == transaction_id), None)
             if transaction:
                 transaction["stage"] = stage
+                save_demo_memory_to_sqlite()
         if not transaction:
             self.send_json(HTTPStatus.NOT_FOUND, {"error": "Transaction not found"})
         else:
@@ -2007,6 +2218,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 before = len(DEMO_DB[table])
                 DEMO_DB[table] = [row for row in DEMO_DB[table] if row[key] != row_id]
                 deleted = len(DEMO_DB[table]) < before
+                if deleted:
+                    save_demo_memory_to_sqlite()
             if not deleted:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": message})
             else:
@@ -2019,13 +2232,14 @@ class ApiHandler(BaseHTTPRequestHandler):
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Rate limit exceeded"})
             return
 
-        path = urlparse(self.path).path
+        parsed_url = urlparse(self.path)
+        path = parsed_url.path
         if path == "/api/health":
             self.send_json(
                 HTTPStatus.OK,
                 {
                     "ok": True,
-                    "database": "demo_memory" if local_demo_mode() else "postgresql",
+                    "database": "demo_sqlite" if local_demo_mode() else "postgresql",
                     "auth": "demo_jwt" if local_demo_mode() else "jwt",
                 },
             )
@@ -2033,6 +2247,12 @@ class ApiHandler(BaseHTTPRequestHandler):
 
         if path in {"/openapi.json", "/api/openapi.json"}:
             self.send_openapi_spec()
+            return
+
+        if path == "/api/optimizer":
+            mode = parse_qs(parsed_url.query).get("mode", ["classical"])[0]
+            self.log_event("optimizer_payload", mode=mode, ip=self.client_ip())
+            self.send_json(HTTPStatus.OK, optimizer_payload(mode))
             return
 
         if local_demo_mode() and self.handle_demo_get(path):
@@ -2800,7 +3020,7 @@ def main() -> None:
 
     if config.local_demo_mode:
         seed_demo_memory()
-        schema_mode = "demo_memory"
+        schema_mode = "demo_sqlite"
     else:
         init_pool()
         if config.app_environment == "production" or config.require_alembic_migrations:
@@ -2816,7 +3036,8 @@ def main() -> None:
         "api_started",
         host=host,
         port=port,
-        database="demo_memory" if config.local_demo_mode else "postgresql",
+        database="demo_sqlite" if config.local_demo_mode else "postgresql",
+        database_file=str(DEMO_SQLITE_FILE) if config.local_demo_mode else None,
         auth="demo_jwt" if config.local_demo_mode else "jwt",
         schema_mode=schema_mode,
     )

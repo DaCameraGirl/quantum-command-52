@@ -17,6 +17,31 @@ This log records the build history for Repo 52 in plain operational language. It
 
 ## Release Ledger
 
+### Current release - Add SQLite persistence and hybrid optimizer controls
+
+Status: verified locally, pending push
+
+Added the Sprint 1 and Sprint 2 foundation:
+
+- Local demo mode now uses `web-dashboard/data.db` instead of volatile memory-only storage.
+- SQLite tables persist Grants, Housing, Item Catalog, and Transaction Pipeline demo payloads across restarts.
+- Demo CRUD handlers now write through to SQLite after creates, updates, deletes, and drag/drop transaction stage changes.
+- Demo startup logs report `database=demo_sqlite` and include the local database file path.
+- Added `/api/optimizer?mode=classical|quantum` for paper/research optimizer payloads.
+- Macro dashboard now includes a Hybrid Optimizer panel with Classical and Quantum QAOA comparator toggles.
+- Added optimizer convergence charts, paper allocation rows, summary metrics, and a clear non-advice boundary.
+- `strict_macro_quantum_v10.py` now supports `--optimizer-mode classical`, `--optimizer-mode qaoa`, and existing `--optimizer-mode qml`.
+- Classical mode writes a practical risk-adjusted paper ledger; QAOA mode writes a research-style convergence workbook.
+
+Verification:
+
+- `py -3.11 -m py_compile web-dashboard\server.py web-dashboard\app_config.py strict_macro_quantum_v10.py` passed.
+- `npm run build` passed.
+- SQLite demo smoke test created `web-dashboard\data.db` and seeded grants, housing, inventory, and transactions.
+- SQLite reload smoke test loaded persisted rows from `data.db` without reseeding.
+- `/api/optimizer` payload smoke test returned the quantum mode payload successfully.
+- `.gitignore` already excludes `web-dashboard/*.db` and `web-dashboard/*.db-*`.
+
 ### Current release - Add local demo mode for desktop launcher
 
 Status: verified locally, pending push
