@@ -1397,6 +1397,7 @@ function Dashboard({ user, onLogout }) {
   const [optimizerRunsError, setOptimizerRunsError] = useState("");
   const [optimizerJobs, setOptimizerJobs] = useState(null);
   const [optimizerJobsError, setOptimizerJobsError] = useState("");
+  const [selectedOptimizerJobId, setSelectedOptimizerJobId] = useState(null);
   const [optimizerJobForm, setOptimizerJobForm] = useState({
     assets: "BTC,ETH,SOL,NVDA",
     budget: "2",
@@ -1440,6 +1441,12 @@ function Dashboard({ user, onLogout }) {
     try {
       const payload = await api("/api/optimizer/jobs");
       setOptimizerJobs(payload);
+      setSelectedOptimizerJobId((current) => {
+        const jobs = payload?.jobs || [];
+        const currentExists = jobs.some((job) => String(job.job_id) === String(current));
+        if (current && currentExists) return current;
+        return payload?.latest?.job_id || null;
+      });
     } catch (err) {
       setOptimizerJobsError(err.message);
     }
@@ -1451,7 +1458,7 @@ function Dashboard({ user, onLogout }) {
   }, []);
 
   useEffect(() => {
-    const activeJobs = optimizerJobs?.jobs?.some((job) => ["queued", "running"].includes(job.status));
+    const activeJobs = optimizerJobs?.jobs?.some((job) => ["queued", "running", "cancel_requested"].includes(job.status));
     if (!activeJobs) return undefined;
     const timer = setInterval(() => {
       loadOptimizerJobs();
@@ -1481,6 +1488,35 @@ function Dashboard({ user, onLogout }) {
       setOptimizerJobsError(err.message);
     } finally {
       setQueueingOptimizerJob(false);
+    }
+  }
+
+  async function cancelOptimizerJob(jobId) {
+    setOptimizerJobsError("");
+    try {
+      await api(`/api/optimizer/jobs/${jobId}/cancel`, {
+        method: "PATCH",
+        body: JSON.stringify({}),
+      });
+      await loadOptimizerJobs();
+      await loadOptimizerRuns();
+    } catch (err) {
+      setOptimizerJobsError(err.message);
+    }
+  }
+
+  async function retryOptimizerJob(jobId) {
+    setOptimizerJobsError("");
+    try {
+      const payload = await api(`/api/optimizer/jobs/${jobId}/retry`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setSelectedOptimizerJobId(payload?.job?.job_id || jobId);
+      await loadOptimizerJobs();
+      await loadOptimizerRuns();
+    } catch (err) {
+      setOptimizerJobsError(err.message);
     }
   }
 
@@ -1529,6 +1565,10 @@ function Dashboard({ user, onLogout }) {
 
   const latestQaoaRun = optimizerRuns?.latest || null;
   const latestOptimizerJob = optimizerJobs?.latest || null;
+  const selectedOptimizerJob = useMemo(
+    () => (optimizerJobs?.jobs || []).find((job) => String(job.job_id) === String(selectedOptimizerJobId)) || latestOptimizerJob,
+    [optimizerJobs, selectedOptimizerJobId, latestOptimizerJob],
+  );
 
   return (
     <main className="command-shell">
@@ -1845,7 +1885,12 @@ function Dashboard({ user, onLogout }) {
                     {optimizerJobsError && <div className="error-line">{optimizerJobsError}</div>}
                     <div className="optimizer-job-grid">
                       {(optimizerJobs?.jobs || []).slice(0, 4).map((job) => (
-                        <div className="optimizer-job-card" key={job.job_id}>
+                        <button
+                          className={`optimizer-job-card ${String(selectedOptimizerJob?.job_id) === String(job.job_id) ? "selected" : ""}`}
+                          key={job.job_id}
+                          type="button"
+                          onClick={() => setSelectedOptimizerJobId(job.job_id)}
+                        >
                           <div>
                             <span>Job {job.job_id}</span>
                             <strong>{job.status}</strong>
@@ -1853,10 +1898,87 @@ function Dashboard({ user, onLogout }) {
                           <small>{(job.assets || []).join(", ")} | budget {job.budget} | reps {job.reps}</small>
                           {job.durationSeconds != null && <small>{job.durationSeconds}s runtime</small>}
                           {job.error && <p>{job.error}</p>}
-                        </div>
+                        </button>
                       ))}
                       {!(optimizerJobs?.jobs || []).length && <div className="empty-panel">No queued optimizer jobs yet.</div>}
                     </div>
+                    {selectedOptimizerJob && (
+                      <div className="optimizer-job-detail">
+                        <div className="optimizer-job-detail-header">
+                          <div>
+                            <p className="eyebrow">Job detail view</p>
+                            <h3>Optimizer Job {selectedOptimizerJob.job_id}</h3>
+                          </div>
+                          <StatusPill status={selectedOptimizerJob.status} />
+                        </div>
+                        <div className="optimizer-job-detail-grid">
+                          <div>
+                            <span>Assets</span>
+                            <strong>{(selectedOptimizerJob.assets || []).join(", ") || "None"}</strong>
+                          </div>
+                          <div>
+                            <span>Budget</span>
+                            <strong>{selectedOptimizerJob.budget}</strong>
+                          </div>
+                          <div>
+                            <span>Reps</span>
+                            <strong>{selectedOptimizerJob.reps}</strong>
+                          </div>
+                          <div>
+                            <span>Shots</span>
+                            <strong>{selectedOptimizerJob.shots}</strong>
+                          </div>
+                          <div>
+                            <span>Max iterations</span>
+                            <strong>{selectedOptimizerJob.maxiter}</strong>
+                          </div>
+                          <div>
+                            <span>Duration</span>
+                            <strong>{selectedOptimizerJob.durationSeconds != null ? `${selectedOptimizerJob.durationSeconds}s` : "Pending"}</strong>
+                          </div>
+                          <div>
+                            <span>Created</span>
+                            <strong>{selectedOptimizerJob.createdAt || "Pending"}</strong>
+                          </div>
+                          <div>
+                            <span>Started</span>
+                            <strong>{selectedOptimizerJob.startedAt || "Pending"}</strong>
+                          </div>
+                          <div>
+                            <span>Finished</span>
+                            <strong>{selectedOptimizerJob.finishedAt || "Pending"}</strong>
+                          </div>
+                          <div>
+                            <span>Updated</span>
+                            <strong>{selectedOptimizerJob.updatedAt || "Pending"}</strong>
+                          </div>
+                          <div>
+                            <span>Result run</span>
+                            <strong>{selectedOptimizerJob.resultRunId || "None"}</strong>
+                          </div>
+                          <div>
+                            <span>Retry source</span>
+                            <strong>{selectedOptimizerJob.retryOfJobId || "None"}</strong>
+                          </div>
+                        </div>
+                        <div className="optimizer-job-error-log">
+                          <span>Error log</span>
+                          <code>{selectedOptimizerJob.error || "No errors recorded."}</code>
+                        </div>
+                        <div className="optimizer-job-actions">
+                          {["queued", "running"].includes(selectedOptimizerJob.status) && (
+                            <button className="ghost-button danger-action" type="button" onClick={() => cancelOptimizerJob(selectedOptimizerJob.job_id)}>
+                              Cancel job
+                            </button>
+                          )}
+                          {selectedOptimizerJob.status === "failed" && (
+                            <button className="primary-action" type="button" onClick={() => retryOptimizerJob(selectedOptimizerJob.job_id)}>
+                              <RefreshCw size={16} /> Retry failed job
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="control-panel">

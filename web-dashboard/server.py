@@ -871,7 +871,7 @@ def demo_optimizer_runs_payload() -> dict:
 
 def demo_optimizer_jobs_payload() -> dict:
     jobs = sorted(DEMO_DB["optimizer_jobs"], key=lambda job: int(job.get("job_id", 0)), reverse=True)
-    active_jobs = [job for job in jobs if job.get("status") in {"queued", "running"}]
+    active_jobs = [job for job in jobs if job.get("status") in {"queued", "running", "cancel_requested"}]
     latest = jobs[0] if jobs else None
     return {
         "summary": {
@@ -882,6 +882,40 @@ def demo_optimizer_jobs_payload() -> dict:
         "latest": latest,
         "jobs": jobs[:10],
     }
+
+
+def demo_optimizer_job_by_id(job_id: int) -> dict | None:
+    init_demo_sqlite()
+    table_name, key_name = DEMO_TABLES["optimizer_jobs"]
+    with sqlite3.connect(DEMO_SQLITE_FILE) as connection:
+        row = connection.execute(
+            f"SELECT payload_json FROM {table_name} WHERE {key_name} = ?",
+            (int(job_id),),
+        ).fetchone()
+    if not row:
+        return None
+    return json.loads(row[0])
+
+
+def optimizer_job_cancel_requested(job_id: int) -> bool:
+    job = demo_optimizer_job_by_id(job_id)
+    return bool(job and job.get("status") in {"cancelled", "cancel_requested"})
+
+
+def mark_optimizer_job_cancelled(job: dict, started_at: datetime | None = None, reason: str = "Cancelled by user") -> None:
+    now = utc_now()
+    duration = round((now - started_at).total_seconds(), 2) if started_at else None
+    job.update(
+        {
+            "status": "cancelled",
+            "finishedAt": now,
+            "updatedAt": now,
+            "durationSeconds": duration,
+            "error": reason,
+        }
+    )
+    upsert_demo_sqlite_row("optimizer_jobs", job)
+    log_event("demo_optimizer_job_cancelled", job_id=job["job_id"], reason=reason)
 
 
 def clean_optimizer_job_payload(payload: dict) -> dict:
@@ -928,14 +962,23 @@ def covariance_from_default_assets(assets: list[str]) -> tuple[list[str], object
 
 def run_demo_optimizer_job(job: dict) -> None:
     started_at = utc_now()
+    if optimizer_job_cancel_requested(int(job["job_id"])):
+        mark_optimizer_job_cancelled(job, reason="Cancelled before worker startup")
+        return
     job.update({"status": "running", "startedAt": started_at, "updatedAt": started_at})
     upsert_demo_sqlite_row("optimizer_jobs", job)
     try:
+        if optimizer_job_cancel_requested(int(job["job_id"])):
+            mark_optimizer_job_cancelled(job, started_at, "Cancelled before QAOA imports")
+            return
         if str(REPO_ROOT) not in sys.path:
             sys.path.insert(0, str(REPO_ROOT))
         from qaoa_portfolio_optimizer import build_qubo, optimize_portfolio_qaoa, portfolio_energy
 
         assets, mu, covariance = covariance_from_default_assets(job["assets"])
+        if optimizer_job_cancel_requested(int(job["job_id"])):
+            mark_optimizer_job_cancelled(job, started_at, "Cancelled before QAOA optimization")
+            return
         result = optimize_portfolio_qaoa(
             assets,
             mu,
@@ -945,6 +988,9 @@ def run_demo_optimizer_job(job: dict) -> None:
             maxiter=int(job["maxiter"]),
             shots=int(job["shots"]),
         )
+        if optimizer_job_cancel_requested(int(job["job_id"])):
+            mark_optimizer_job_cancelled(job, started_at, "Cancelled before QAOA result save")
+            return
         q_matrix = build_qubo(mu, covariance, int(job["budget"]), risk_factor=0.5, penalty=2.0)
         top_counts = sorted(result.counts.items(), key=lambda item: item[1], reverse=True)[:8]
         run_id = int(time.time() * 1000)
@@ -1000,7 +1046,7 @@ def run_demo_optimizer_job(job: dict) -> None:
         upsert_demo_sqlite_row("optimizer_jobs", job)
 
 
-def queue_demo_optimizer_job(payload: dict) -> dict:
+def queue_demo_optimizer_job(payload: dict, extra_fields: dict | None = None) -> dict:
     values = clean_optimizer_job_payload(payload)
     now = utc_now()
     job = {
@@ -1014,11 +1060,68 @@ def queue_demo_optimizer_job(payload: dict) -> dict:
         "startedAt": None,
         "finishedAt": None,
         "updatedAt": now,
+        **(extra_fields or {}),
     }
     upsert_demo_sqlite_row("optimizer_jobs", job)
     worker = threading.Thread(target=run_demo_optimizer_job, args=(dict(job),), daemon=True)
     worker.start()
     return job
+
+
+def cancel_demo_optimizer_job(job_id: int) -> tuple[HTTPStatus, dict]:
+    load_demo_memory_from_sqlite()
+    job = next((item for item in DEMO_DB["optimizer_jobs"] if int(item["job_id"]) == int(job_id)), None)
+    if not job:
+        return HTTPStatus.NOT_FOUND, {"error": "Optimizer job not found"}
+
+    status = str(job.get("status", "")).lower()
+    now = utc_now()
+    if status == "queued":
+        job.update(
+            {
+                "status": "cancelled",
+                "finishedAt": now,
+                "updatedAt": now,
+                "durationSeconds": 0,
+                "error": "Cancelled before execution",
+            }
+        )
+    elif status == "running":
+        job.update(
+            {
+                "status": "cancel_requested",
+                "updatedAt": now,
+                "error": "Cancellation requested; worker will stop at the next safe checkpoint.",
+            }
+        )
+    elif status == "cancel_requested":
+        job["updatedAt"] = now
+    else:
+        return HTTPStatus.CONFLICT, {"error": f"Optimizer job is already terminal: {job.get('status')}"}
+
+    upsert_demo_sqlite_row("optimizer_jobs", job)
+    return HTTPStatus.OK, {"job": job}
+
+
+def retry_demo_optimizer_job(job_id: int) -> tuple[HTTPStatus, dict]:
+    load_demo_memory_from_sqlite()
+    source_job = next((item for item in DEMO_DB["optimizer_jobs"] if int(item["job_id"]) == int(job_id)), None)
+    if not source_job:
+        return HTTPStatus.NOT_FOUND, {"error": "Optimizer job not found"}
+    if source_job.get("status") != "failed":
+        return HTTPStatus.CONFLICT, {"error": "Only failed optimizer jobs can be retried."}
+
+    job = queue_demo_optimizer_job(
+        {
+            "assets": source_job.get("assets", []),
+            "budget": source_job.get("budget"),
+            "reps": source_job.get("reps"),
+            "shots": source_job.get("shots"),
+            "maxiter": source_job.get("maxiter"),
+        },
+        {"retryOfJobId": int(job_id)},
+    )
+    return HTTPStatus.ACCEPTED, {"job": job}
 
 
 def normalized_weights(raw_scores: list[float]) -> list[float]:
@@ -2181,6 +2284,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         except ValueError:
             return None
 
+    def optimizer_job_action_from_path(self, path: str, action: str) -> int | None:
+        parts = [part for part in path.split("/") if part]
+        if len(parts) != 5 or parts[0] != "api" or parts[1] != "optimizer" or parts[2] != "jobs" or parts[4] != action:
+            return None
+        try:
+            return int(parts[3])
+        except ValueError:
+            return None
+
     def send_demo_session(self) -> None:
         self.send_json(
             HTTPStatus.OK,
@@ -2251,6 +2363,13 @@ class ApiHandler(BaseHTTPRequestHandler):
             job = queue_demo_optimizer_job(payload)
             self.log_event("demo_optimizer_job_queued", user_id=DEMO_USER["id"], job_id=job["job_id"], ip=self.client_ip())
             self.send_json(HTTPStatus.ACCEPTED, {"job": job})
+            return True
+        retry_job_id = self.optimizer_job_action_from_path(path, "retry")
+        if retry_job_id is not None:
+            status, response = retry_demo_optimizer_job(retry_job_id)
+            if status == HTTPStatus.ACCEPTED:
+                self.log_event("demo_optimizer_job_retried", user_id=DEMO_USER["id"], source_job_id=retry_job_id, job_id=response["job"]["job_id"], ip=self.client_ip())
+            self.send_json(status, response)
             return True
         if path == "/api/grants":
             try:
@@ -2419,6 +2538,14 @@ class ApiHandler(BaseHTTPRequestHandler):
         return False
 
     def handle_demo_patch(self, path: str, payload: dict) -> bool:
+        cancel_job_id = self.optimizer_job_action_from_path(path, "cancel")
+        if cancel_job_id is not None:
+            status, response = cancel_demo_optimizer_job(cancel_job_id)
+            if status == HTTPStatus.OK:
+                self.log_event("demo_optimizer_job_cancel_requested", user_id=DEMO_USER["id"], job_id=cancel_job_id, status=response["job"]["status"], ip=self.client_ip())
+            self.send_json(status, response)
+            return True
+
         transaction_id = self.transaction_stage_from_path(path)
         if transaction_id is None:
             return False

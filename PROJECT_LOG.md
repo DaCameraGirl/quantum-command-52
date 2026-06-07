@@ -17,6 +17,32 @@ This log records the build history for Repo 52 in plain operational language. It
 
 ## Release Ledger
 
+### Current release - Add optimizer operability controls
+
+Status: verified locally, pending push
+
+Added enterprise operability controls for the local optimizer research engine:
+
+- Added demo-mode `PATCH /api/optimizer/jobs/{job_id}/cancel`.
+- Cancel requests now persist into the SQLite job ledger.
+- Queued jobs cancel immediately with a terminal `cancelled` state.
+- Running jobs move to `cancel_requested` so the worker can exit cleanly at the next safe checkpoint.
+- QAOA worker now checks for cancellation before import, optimization, and result-save stages.
+- Added demo-mode `POST /api/optimizer/jobs/{job_id}/retry`.
+- Retry is restricted to failed jobs and clones the original assets, budget, reps, shots, and max iteration parameters.
+- Retried jobs preserve `retryOfJobId` for audit traceability.
+- Dashboard job cards are now selectable.
+- Dashboard job detail view shows full parameters, timestamps, duration, result run linkage, retry lineage, and error logs.
+- Dashboard detail actions expose cancel for active jobs and retry for failed jobs.
+- Optimizer polling now tracks `cancel_requested` as an active state until the worker reaches a terminal status.
+
+Verification:
+
+- `py -3.11 -m py_compile web-dashboard\server.py web-dashboard\app_config.py strict_macro_quantum_v10.py qaoa_portfolio_optimizer.py` passed.
+- `npm run build` passed.
+- Temporary SQLite smoke test verified queued-job cancellation reaches `cancelled`.
+- Temporary SQLite smoke test verified failed-job retry creates a new queued job with `retryOfJobId`.
+
 ### Current release - Add SQLite persistence and hybrid optimizer controls
 
 Status: verified locally, pending push
