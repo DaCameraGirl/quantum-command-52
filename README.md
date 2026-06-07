@@ -198,6 +198,14 @@ Services:
 4. Run the matching script.
 5. Use the generated Markdown/CSV files in `output`.
 
+## 🔒 License
+
+Copyright (c) 2026 Angela Nelson. All Rights Reserved.
+
+This repository is public for viewing only. No permission is granted to use, copy, modify, publish, distribute, sell, sublicense, or create derivative works from this software without prior written permission.
+
+Full terms: [LICENSE](LICENSE)
+
 ## 🚧 Limits
 
 - No script guarantees a grant, benefit, settlement, or sale price.
