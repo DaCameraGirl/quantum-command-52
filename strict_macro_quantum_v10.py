@@ -531,7 +531,7 @@ def main() -> None:
     load_dotenv(dotenv_path=ENV_FILE)
 
     parser = argparse.ArgumentParser(description="Strict IBM/Qiskit/YFinance QML macro matrix.")
-    parser.add_argument("--bankroll", type=float, default=500000.0)
+    parser.add_argument("--bankroll", type=float, default=1000.0)
     parser.add_argument("--assets", default="AAPL,MSFT,NVDA,AMZN")
     parser.add_argument("--period", default="60d")
     parser.add_argument("--backend", default=None)

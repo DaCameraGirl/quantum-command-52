@@ -3,7 +3,7 @@
   "info": {
     "title": "Data-Analytics Quantum Command API",
     "version": "1.0.0",
-    "description": "Authenticated API contract for Repo 52 portfolio, grants, housing, inventory, real estate transaction, and Stripe billing routes."
+    "description": "Authenticated API contract for Repo 52 portfolio, grants, housing, inventory, real estate transaction, and quantum optimizer routes."
   },
   "servers": [
     {
@@ -54,6 +54,7 @@
         "required": ["grantName", "fundingAmount", "applicationDifficulty"],
         "properties": {
           "grantName": { "type": "string" },
+          "sourceUrl": { "type": "string", "format": "uri", "nullable": true },
           "fundingAmount": { "type": "number", "minimum": 0 },
           "deadline": { "type": "string", "format": "date", "nullable": true },
           "applicationDifficulty": { "type": "integer", "minimum": 1, "maximum": 5 },
@@ -70,6 +71,7 @@
           "category": { "type": "string" },
           "description": { "type": "string" },
           "areaLocation": { "type": "string" },
+          "sourceUrl": { "type": "string", "format": "uri", "nullable": true },
           "requestDate": { "type": "string", "format": "date" },
           "resolveDate": { "type": "string", "format": "date", "nullable": true },
           "severityLevel": { "type": "integer", "minimum": 1, "maximum": 10 },
@@ -87,6 +89,7 @@
           "category": { "type": "string" },
           "estimatedMarketValue": { "type": "number", "minimum": 0 },
           "quantity": { "type": "integer", "minimum": 1 },
+          "sourceUrl": { "type": "string", "format": "uri", "nullable": true },
           "notes": { "type": "string" }
         }
       },
@@ -123,13 +126,6 @@
         "required": ["stage"],
         "properties": {
           "stage": { "type": "string", "enum": ["listing", "under_contract", "closing", "closed"] }
-        }
-      },
-      "StripeCheckoutRequest": {
-        "type": "object",
-        "required": ["tier"],
-        "properties": {
-          "tier": { "type": "string", "enum": ["starter", "pro", "enterprise"] }
         }
       }
     },
@@ -347,33 +343,6 @@
           "200": { "description": "Stage updated" },
           "404": { "$ref": "#/components/responses/NotFound" },
           "500": { "description": "Database state transition failed" }
-        }
-      }
-    },
-    "/api/stripe/checkout": {
-      "post": {
-        "summary": "Create a Stripe Checkout subscription session",
-        "security": [{ "cookieJwt": [] }, { "bearerJwt": [] }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StripeCheckoutRequest" } } }
-        },
-        "responses": {
-          "201": { "description": "Stripe Checkout session created" },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "503": { "description": "Stripe Checkout is not configured" }
-        }
-      }
-    },
-    "/api/stripe/webhook": {
-      "post": {
-        "summary": "Receive Stripe webhook events",
-        "description": "Verifies Stripe-Signature and idempotently records accepted events.",
-        "responses": {
-          "200": { "description": "Event accepted" },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "503": { "description": "Webhook secret is not configured" }
         }
       }
     }

@@ -49,7 +49,7 @@ RATE_LIMIT_LOCK = threading.Lock()
 RATE_LIMIT_BUCKETS: dict[str, list[float]] = {}
 SENSITIVE_LOG_KEYS = {"secret", "password", "token", "key", "database_url", "dsn"}
 STRIPE_CHECKOUT_ENDPOINT = "https://api.stripe.com/v1/checkout/sessions"
-REQUIRED_ALEMBIC_REVISION = "001_initial_enterprise_schema"
+REQUIRED_ALEMBIC_REVISION = "003_add_source_urls_to_housing_inventory"
 DEMO_SQLITE_FILE = ROOT / "data.db"
 DEMO_LOCK = threading.RLock()
 DEMO_USER = {
@@ -225,6 +225,7 @@ def init_db() -> None:
                 id BIGSERIAL PRIMARY KEY,
                 user_id BIGINT NOT NULL REFERENCES user_profiles(id) ON DELETE CASCADE,
                 grant_name TEXT NOT NULL,
+                source_url TEXT NOT NULL DEFAULT '',
                 funding_amount DOUBLE PRECISION NOT NULL CHECK (funding_amount >= 0),
                 deadline DATE,
                 application_difficulty INTEGER NOT NULL CHECK (application_difficulty BETWEEN 1 AND 5),
@@ -240,6 +241,7 @@ def init_db() -> None:
                 category TEXT NOT NULL,
                 description TEXT NOT NULL,
                 area_location TEXT NOT NULL,
+                source_url TEXT NOT NULL DEFAULT '',
                 request_date DATE NOT NULL,
                 resolve_date DATE,
                 severity_level INTEGER NOT NULL CHECK (severity_level BETWEEN 1 AND 10),
@@ -255,6 +257,7 @@ def init_db() -> None:
                 category TEXT NOT NULL,
                 estimated_market_value DOUBLE PRECISION NOT NULL CHECK (estimated_market_value >= 0),
                 quantity INTEGER NOT NULL CHECK (quantity > 0),
+                source_url TEXT NOT NULL DEFAULT '',
                 notes TEXT NOT NULL DEFAULT '',
                 acquired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -358,6 +361,9 @@ def init_db() -> None:
                 ON stripe_webhook_events(event_type, received_at DESC);
             """
         )
+        cursor.execute("ALTER TABLE grant_ledger ADD COLUMN IF NOT EXISTS source_url TEXT NOT NULL DEFAULT ''")
+        cursor.execute("ALTER TABLE housing_incidents ADD COLUMN IF NOT EXISTS source_url TEXT NOT NULL DEFAULT ''")
+        cursor.execute("ALTER TABLE asset_inventory ADD COLUMN IF NOT EXISTS source_url TEXT NOT NULL DEFAULT ''")
 
 
 def require_alembic_schema() -> None:
@@ -399,10 +405,12 @@ def normalize_demo_row(table: str, row: dict) -> dict:
     if table == "grants":
         row["deadline"] = parse_demo_date(row.get("deadline"))
     elif table == "housing":
+        row["source_url"] = str(row.get("source_url") or row.pop("sourceUrl", "") or "")
         row["request_date"] = parse_demo_date(row.get("request_date"))
         row["resolve_date"] = parse_demo_date(row.get("resolve_date"))
         row = enrich_housing_incident(row)
     elif table == "inventory":
+        row["source_url"] = str(row.get("source_url") or row.pop("sourceUrl", "") or "")
         row = enrich_inventory_item(row)
     elif table == "transactions":
         row["closingDate"] = parse_demo_date(row.get("closingDate"))
@@ -542,10 +550,289 @@ def demo_portfolio_payload() -> dict:
     }
 
 
+def demo_grant_seed_rows() -> list[dict]:
+    return [
+        {
+            "grant_name": "Patsy Takemoto Mink Education Support Award",
+            "source_url": "https://www.patsyminkfoundation.org/education-support-application",
+            "funding_amount": 5000.0,
+            "deadline": None,
+            "application_difficulty": 2,
+            "status": "research",
+        },
+        {
+            "grant_name": "Modest Needs Self-Sufficiency Grant",
+            "source_url": "https://www.modestneeds.org/mn/about-us/grants/self-sufficiency-grants",
+            "funding_amount": 1000.0,
+            "deadline": None,
+            "application_difficulty": 3,
+            "status": "research",
+        },
+        {
+            "grant_name": "Autism Care Today Family Grant",
+            "source_url": "https://www.act-today.org/apply-for-grant/",
+            "funding_amount": 5000.0,
+            "deadline": None,
+            "application_difficulty": 3,
+            "status": "research",
+        },
+        {
+            "grant_name": "SSA SSI for Children",
+            "source_url": "https://www.ssa.gov/ssi/text-child-ussi.htm",
+            "funding_amount": 0.0,
+            "deadline": None,
+            "application_difficulty": 4,
+            "status": "research",
+        },
+        {
+            "grant_name": "HUD Find Shelter",
+            "source_url": "https://www.hud.gov/FindShelter",
+            "funding_amount": 0.0,
+            "deadline": None,
+            "application_difficulty": 1,
+            "status": "ready",
+        },
+        {
+            "grant_name": "USAGov Emergency Housing",
+            "source_url": "https://www.usa.gov/emergency-housing",
+            "funding_amount": 0.0,
+            "deadline": None,
+            "application_difficulty": 1,
+            "status": "ready",
+        },
+        {
+            "grant_name": "USAGov Emergency Rent Assistance Directory",
+            "source_url": "https://www.usa.gov/emergency-pay-rent",
+            "funding_amount": 0.0,
+            "deadline": None,
+            "application_difficulty": 2,
+            "status": "research",
+        },
+        {
+            "grant_name": "CareerOneStop Scholarship Finder",
+            "source_url": "https://www.careeronestop.org/Toolkit/Training/find-scholarships.aspx",
+            "funding_amount": 0.0,
+            "deadline": None,
+            "application_difficulty": 2,
+            "status": "research",
+        },
+        {
+            "grant_name": "Soroptimist Live Your Dream Awards",
+            "source_url": "https://www.liveyourdream.org/our-dream/opportunity-through-education/education-grants.html",
+            "funding_amount": 3000.0,
+            "deadline": date(2026, 11, 15),
+            "application_difficulty": 2,
+            "status": "ready",
+        },
+    ]
+
+
+def shaped_demo_grant(index: int, grant: dict) -> dict:
+    return {
+        "id": index,
+        **grant,
+        "priority_score": calculate_grant_priority(
+            funding_amount=grant["funding_amount"],
+            deadline=grant["deadline"],
+            application_difficulty=grant["application_difficulty"],
+            status=grant["status"],
+        ),
+        "created_at": utc_now(),
+        "updated_at": utc_now(),
+    }
+
+
+def refresh_legacy_demo_grants() -> bool:
+    legacy_names = {
+        "Women in Analytics Emergency Scholarship",
+        "Small Business Digital Tools Award",
+        "Continuing Education Support Fund",
+    }
+    seed_names = {grant["grant_name"] for grant in demo_grant_seed_rows()}
+    existing_names = {grant.get("grant_name") for grant in DEMO_DB["grants"]}
+    if DEMO_DB["grants"] and existing_names.issubset(legacy_names | seed_names) and existing_names != seed_names:
+        DEMO_DB["grants"] = [shaped_demo_grant(index, grant) for index, grant in enumerate(demo_grant_seed_rows(), start=1)]
+        return True
+
+    changed = False
+    for grant in DEMO_DB["grants"]:
+        if "source_url" not in grant:
+            grant["source_url"] = ""
+            changed = True
+    return changed
+
+
+def demo_housing_seed_rows() -> list[dict]:
+    return [
+        {
+            "category": "Shelter",
+            "description": "Find local shelters, food pantries, health clinics, and clothing resources.",
+            "area_location": "HUD national resource finder",
+            "source_url": "https://www.hud.gov/FindShelter",
+            "request_date": shift_date(-1),
+            "resolve_date": None,
+            "severity_level": 10,
+            "status": "open",
+        },
+        {
+            "category": "Emergency Housing",
+            "description": "Government guide for immediate housing help when facing homelessness.",
+            "area_location": "USAGov emergency housing",
+            "source_url": "https://www.usa.gov/emergency-housing",
+            "request_date": shift_date(-1),
+            "resolve_date": None,
+            "severity_level": 10,
+            "status": "open",
+        },
+        {
+            "category": "Legal Aid",
+            "description": "Find local civil legal aid for eviction, unsafe housing, benefits, and family issues.",
+            "area_location": "Legal Services Corporation locator",
+            "source_url": "https://www.lsc.gov/about-lsc/what-legal-aid/i-need-legal-help",
+            "request_date": shift_date(-2),
+            "resolve_date": None,
+            "severity_level": 8,
+            "status": "requested",
+        },
+        {
+            "category": "Local Referral",
+            "description": "Call or search 211 for local help with housing, utilities, food, and crisis referrals.",
+            "area_location": "United Way 211",
+            "source_url": "https://www.211.org/get-help/housing-expenses?hl=en-US",
+            "request_date": shift_date(-2),
+            "resolve_date": None,
+            "severity_level": 8,
+            "status": "requested",
+        },
+        {
+            "category": "Housing Counseling",
+            "description": "Search for HUD-approved housing counseling agencies by zip code or state.",
+            "area_location": "HUD housing counseling",
+            "source_url": "https://www.hud.gov/counseling",
+            "request_date": shift_date(-3),
+            "resolve_date": None,
+            "severity_level": 7,
+            "status": "open",
+        },
+    ]
+
+
+def shaped_demo_housing(index: int, incident: dict) -> dict:
+    return enrich_housing_incident(
+        {
+            "incident_id": index,
+            **incident,
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
+        }
+    )
+
+
+def refresh_legacy_demo_housing() -> bool:
+    legacy_descriptions = {
+        "Water staining spreading under kitchen ceiling vent.",
+        "Exterior stair light does not turn on after dark.",
+    }
+    seed_descriptions = {incident["description"] for incident in demo_housing_seed_rows()}
+    existing_descriptions = {incident.get("description") for incident in DEMO_DB["housing"]}
+    if (
+        DEMO_DB["housing"]
+        and existing_descriptions.issubset(legacy_descriptions | seed_descriptions)
+        and existing_descriptions != seed_descriptions
+    ):
+        DEMO_DB["housing"] = [
+            shaped_demo_housing(index, incident) for index, incident in enumerate(demo_housing_seed_rows(), start=1)
+        ]
+        return True
+
+    changed = False
+    for incident in DEMO_DB["housing"]:
+        if "source_url" not in incident:
+            incident["source_url"] = ""
+            changed = True
+    return changed
+
+
+def demo_inventory_seed_rows() -> list[dict]:
+    return [
+        {
+            "item_name": "Nikon Z6 II Camera Kit",
+            "category": "Photography",
+            "estimated_market_value": 1179.0,
+            "quantity": 1,
+            "source_url": "https://www.mpb.com/en-us/product/nikon-z6-ii",
+            "notes": "Use the current MPB listing range as a comparable source; verify shutter count and included accessories.",
+            "acquired_at": utc_now(),
+        },
+        {
+            "item_name": "Canon EF 50mm f/1.8 STM Lens",
+            "category": "Photography",
+            "estimated_market_value": 120.0,
+            "quantity": 1,
+            "source_url": "https://www.mpb.com/en-us/product/canon-ef-50mm-f-1-8-stm",
+            "notes": "Use the current MPB product page as a comparable source; verify condition and included caps.",
+            "acquired_at": utc_now(),
+        },
+        {
+            "item_name": "Completed Listings Research",
+            "category": "General",
+            "estimated_market_value": 0.0,
+            "quantity": 1,
+            "source_url": "https://pages.ebay.com/ga/en-us/completedlistings/",
+            "notes": "Use completed or sold listings to confirm market value before pricing a real item.",
+            "acquired_at": utc_now(),
+        },
+    ]
+
+
+def shaped_demo_inventory(index: int, item: dict) -> dict:
+    return enrich_inventory_item(
+        {
+            "item_id": index,
+            **item,
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
+        }
+    )
+
+
+def refresh_legacy_demo_inventory() -> bool:
+    legacy_names = {
+        "Nikon Z6 II Camera Kit",
+        "Tang Sancai Ceramic Reference Piece",
+    }
+    seed_names = {item["item_name"] for item in demo_inventory_seed_rows()}
+    existing_names = {item.get("item_name") for item in DEMO_DB["inventory"]}
+    if DEMO_DB["inventory"] and existing_names.issubset(legacy_names | seed_names) and existing_names != seed_names:
+        DEMO_DB["inventory"] = [
+            shaped_demo_inventory(index, item) for index, item in enumerate(demo_inventory_seed_rows(), start=1)
+        ]
+        return True
+
+    changed = False
+    for item in DEMO_DB["inventory"]:
+        if "source_url" not in item:
+            item["source_url"] = ""
+            changed = True
+    return changed
+
+
+def refresh_legacy_demo_rows() -> bool:
+    return any(
+        [
+            refresh_legacy_demo_grants(),
+            refresh_legacy_demo_housing(),
+            refresh_legacy_demo_inventory(),
+        ]
+    )
+
+
 def seed_demo_memory() -> None:
     init_demo_sqlite()
     load_demo_memory_from_sqlite()
     if any(DEMO_DB[table] for table in DEMO_CORE_TABLES):
+        if refresh_legacy_demo_rows():
+            save_demo_memory_to_sqlite()
         log_event(
             "demo_sqlite_loaded",
             database=str(DEMO_SQLITE_FILE),
@@ -557,107 +844,15 @@ def seed_demo_memory() -> None:
         )
         return
 
-    grant_rows = [
-        {
-            "grant_name": "Women in Analytics Emergency Scholarship",
-            "funding_amount": 7500.0,
-            "deadline": shift_date(12),
-            "application_difficulty": 2,
-            "status": "ready",
-        },
-        {
-            "grant_name": "Small Business Digital Tools Award",
-            "funding_amount": 12000.0,
-            "deadline": shift_date(28),
-            "application_difficulty": 3,
-            "status": "research",
-        },
-        {
-            "grant_name": "Continuing Education Support Fund",
-            "funding_amount": 4200.0,
-            "deadline": shift_date(6),
-            "application_difficulty": 1,
-            "status": "ready",
-        },
-    ]
-    for index, grant in enumerate(grant_rows, start=1):
-        DEMO_DB["grants"].append(
-            {
-                "id": index,
-                **grant,
-                "priority_score": calculate_grant_priority(
-                    funding_amount=grant["funding_amount"],
-                    deadline=grant["deadline"],
-                    application_difficulty=grant["application_difficulty"],
-                    status=grant["status"],
-                ),
-                "created_at": utc_now(),
-                "updated_at": utc_now(),
-            }
-        )
+    for index, grant in enumerate(demo_grant_seed_rows(), start=1):
+        DEMO_DB["grants"].append(shaped_demo_grant(index, grant))
 
     DEMO_DB["housing"].extend(
-        [
-            enrich_housing_incident(
-                {
-                    "incident_id": 1,
-                    "category": "Maintenance",
-                    "description": "Water staining spreading under kitchen ceiling vent.",
-                    "area_location": "Kitchen ceiling",
-                    "request_date": shift_date(-9),
-                    "resolve_date": None,
-                    "severity_level": 7,
-                    "status": "requested",
-                    "created_at": utc_now(),
-                    "updated_at": utc_now(),
-                }
-            ),
-            enrich_housing_incident(
-                {
-                    "incident_id": 2,
-                    "category": "Safety",
-                    "description": "Exterior stair light does not turn on after dark.",
-                    "area_location": "Front stairwell",
-                    "request_date": shift_date(-3),
-                    "resolve_date": None,
-                    "severity_level": 8,
-                    "status": "open",
-                    "created_at": utc_now(),
-                    "updated_at": utc_now(),
-                }
-            ),
-        ]
+        [shaped_demo_housing(index, incident) for index, incident in enumerate(demo_housing_seed_rows(), start=1)]
     )
 
     DEMO_DB["inventory"].extend(
-        [
-            enrich_inventory_item(
-                {
-                    "item_id": 1,
-                    "item_name": "Nikon Z6 II Camera Kit",
-                    "category": "Camera Gear",
-                    "estimated_market_value": 1450.0,
-                    "quantity": 1,
-                    "notes": "Body, lens, batteries, charger.",
-                    "acquired_at": utc_now(),
-                    "created_at": utc_now(),
-                    "updated_at": utc_now(),
-                }
-            ),
-            enrich_inventory_item(
-                {
-                    "item_id": 2,
-                    "item_name": "Tang Sancai Ceramic Reference Piece",
-                    "category": "Collectibles",
-                    "estimated_market_value": 325.0,
-                    "quantity": 2,
-                    "notes": "Demo catalog example for historical-object tracking.",
-                    "acquired_at": utc_now(),
-                    "created_at": utc_now(),
-                    "updated_at": utc_now(),
-                }
-            ),
-        ]
+        [shaped_demo_inventory(index, item) for index, item in enumerate(demo_inventory_seed_rows(), start=1)]
     )
 
     DEMO_DB["transactions"].extend(
@@ -1178,6 +1373,7 @@ def optimizer_payload(mode: str) -> dict:
         ]
 
     weights = normalized_weights(raw_scores)
+    paper_capital = round(sum(float(asset.get("paper_cash", 0.0)) for asset in source_assets), 2)
     allocations = []
     for index, asset in enumerate(source_assets):
         allocation = weights[index]
@@ -1186,7 +1382,7 @@ def optimizer_payload(mode: str) -> dict:
                 "ticker": asset["ticker"],
                 "name": asset["name"],
                 "weight": round(allocation, 6),
-                "paperCapital": round(allocation * 500000, 2),
+                "paperCapital": round(allocation * paper_capital, 2),
                 "expectedReturn": asset["expected_return"],
                 "volatility": asset["volatility"],
             }
@@ -1202,7 +1398,7 @@ def optimizer_payload(mode: str) -> dict:
         "description": description,
         "artifactCommand": artifact_command,
         "summary": {
-            "paperCapital": 500000,
+            "paperCapital": paper_capital,
             "expectedReturn": round(expected_return, 4),
             "risk": round(risk, 4),
             "score": round(score, 4),
@@ -1317,10 +1513,22 @@ def parse_deadline(value) -> date | None:
     raise ValueError("deadline must use YYYY-MM-DD, MM/DD/YYYY, or MM/DD/YY")
 
 
+def clean_source_url(payload: dict, field_name: str = "sourceUrl") -> str:
+    source_url = str(payload.get("sourceUrl") or payload.get("source_url") or "").strip()
+    if not source_url:
+        return ""
+    parsed_url = urlparse(source_url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        raise ValueError(f"{field_name} must be a valid http or https URL")
+    return source_url
+
+
 def grant_payload(payload: dict) -> dict:
     grant_name = str(payload.get("grantName") or payload.get("grant_name") or "").strip()
     if not grant_name:
         raise ValueError("grantName is required")
+
+    source_url = clean_source_url(payload)
 
     try:
         funding_amount = float(payload.get("fundingAmount", payload.get("funding_amount", 0)))
@@ -1346,6 +1554,7 @@ def grant_payload(payload: dict) -> dict:
     )
     return {
         "grant_name": grant_name,
+        "source_url": source_url,
         "funding_amount": funding_amount,
         "deadline": deadline,
         "application_difficulty": difficulty,
@@ -1370,6 +1579,7 @@ def housing_payload(payload: dict) -> dict:
         raise ValueError("description is required")
     if not area_location:
         raise ValueError("areaLocation is required")
+    source_url = clean_source_url(payload)
 
     request_date = parse_deadline(payload.get("requestDate") or payload.get("request_date"))
     if request_date is None:
@@ -1392,6 +1602,7 @@ def housing_payload(payload: dict) -> dict:
         "category": category,
         "description": description,
         "area_location": area_location,
+        "source_url": source_url,
         "request_date": request_date,
         "resolve_date": resolve_date,
         "severity_level": severity,
@@ -1438,6 +1649,7 @@ def enrich_housing_incident(incident: dict) -> dict:
 def inventory_payload(payload: dict) -> dict:
     item_name = str(payload.get("itemName") or payload.get("item_name") or "").strip()
     category = str(payload.get("category", "")).strip() or "General"
+    source_url = clean_source_url(payload)
     notes = str(payload.get("notes", "")).strip()
     if not item_name:
         raise ValueError("itemName is required")
@@ -1461,6 +1673,7 @@ def inventory_payload(payload: dict) -> dict:
         "category": category,
         "estimated_market_value": estimated_market_value,
         "quantity": quantity,
+        "source_url": source_url,
         "notes": notes,
     }
 
@@ -2683,7 +2896,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             with db_cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, grant_name, funding_amount, deadline, application_difficulty,
+                    SELECT id, grant_name, source_url, funding_amount, deadline, application_difficulty,
                            priority_score, status, created_at, updated_at
                     FROM grant_ledger
                     WHERE user_id = %s
@@ -2716,7 +2929,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             with db_cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT incident_id, category, description, area_location, request_date,
+                    SELECT incident_id, category, description, area_location, source_url, request_date,
                            resolve_date, severity_level, status, created_at, updated_at
                     FROM housing_incidents
                     WHERE user_id = %s
@@ -2752,7 +2965,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             with db_cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT item_id, item_name, category, estimated_market_value, quantity,
+                    SELECT item_id, item_name, category, estimated_market_value, quantity, source_url,
                            notes, acquired_at, created_at, updated_at
                     FROM asset_inventory
                     WHERE user_id = %s
@@ -2946,14 +3159,15 @@ class ApiHandler(BaseHTTPRequestHandler):
                 cursor.execute(
                     """
                     INSERT INTO grant_ledger
-                        (user_id, grant_name, funding_amount, deadline, application_difficulty, priority_score, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    RETURNING id, grant_name, funding_amount, deadline, application_difficulty,
+                        (user_id, grant_name, source_url, funding_amount, deadline, application_difficulty, priority_score, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id, grant_name, source_url, funding_amount, deadline, application_difficulty,
                               priority_score, status, created_at, updated_at
                     """,
                     (
                         user["id"],
                         values["grant_name"],
+                        values["source_url"],
                         values["funding_amount"],
                         values["deadline"],
                         values["application_difficulty"],
@@ -2979,10 +3193,10 @@ class ApiHandler(BaseHTTPRequestHandler):
                 cursor.execute(
                     """
                     INSERT INTO housing_incidents
-                        (user_id, category, description, area_location, request_date,
+                        (user_id, category, description, area_location, source_url, request_date,
                          resolve_date, severity_level, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING incident_id, category, description, area_location, request_date,
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING incident_id, category, description, area_location, source_url, request_date,
                               resolve_date, severity_level, status, created_at, updated_at
                     """,
                     (
@@ -2990,6 +3204,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         values["category"],
                         values["description"],
                         values["area_location"],
+                        values["source_url"],
                         values["request_date"],
                         values["resolve_date"],
                         values["severity_level"],
@@ -3014,9 +3229,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 cursor.execute(
                     """
                     INSERT INTO asset_inventory
-                        (user_id, item_name, category, estimated_market_value, quantity, notes)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING item_id, item_name, category, estimated_market_value, quantity,
+                        (user_id, item_name, category, estimated_market_value, quantity, source_url, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    RETURNING item_id, item_name, category, estimated_market_value, quantity, source_url,
                               notes, acquired_at, created_at, updated_at
                     """,
                     (
@@ -3025,6 +3240,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         values["category"],
                         values["estimated_market_value"],
                         values["quantity"],
+                        values["source_url"],
                         values["notes"],
                     ),
                 )
@@ -3133,10 +3349,11 @@ class ApiHandler(BaseHTTPRequestHandler):
                         category = %s,
                         estimated_market_value = %s,
                         quantity = %s,
+                        source_url = %s,
                         notes = %s,
                         updated_at = now()
                     WHERE item_id = %s AND user_id = %s
-                    RETURNING item_id, item_name, category, estimated_market_value, quantity,
+                    RETURNING item_id, item_name, category, estimated_market_value, quantity, source_url,
                               notes, acquired_at, created_at, updated_at
                     """,
                     (
@@ -3144,6 +3361,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                         values["category"],
                         values["estimated_market_value"],
                         values["quantity"],
+                        values["source_url"],
                         values["notes"],
                         inventory_id,
                         user["id"],
@@ -3171,19 +3389,21 @@ class ApiHandler(BaseHTTPRequestHandler):
                     SET category = %s,
                         description = %s,
                         area_location = %s,
+                        source_url = %s,
                         request_date = %s,
                         resolve_date = %s,
                         severity_level = %s,
                         status = %s,
                         updated_at = now()
                     WHERE incident_id = %s AND user_id = %s
-                    RETURNING incident_id, category, description, area_location, request_date,
+                    RETURNING incident_id, category, description, area_location, source_url, request_date,
                               resolve_date, severity_level, status, created_at, updated_at
                     """,
                     (
                         values["category"],
                         values["description"],
                         values["area_location"],
+                        values["source_url"],
                         values["request_date"],
                         values["resolve_date"],
                         values["severity_level"],
@@ -3212,6 +3432,7 @@ class ApiHandler(BaseHTTPRequestHandler):
                 """
                 UPDATE grant_ledger
                 SET grant_name = %s,
+                    source_url = %s,
                     funding_amount = %s,
                     deadline = %s,
                     application_difficulty = %s,
@@ -3219,11 +3440,12 @@ class ApiHandler(BaseHTTPRequestHandler):
                     status = %s,
                     updated_at = now()
                 WHERE id = %s AND user_id = %s
-                RETURNING id, grant_name, funding_amount, deadline, application_difficulty,
+                RETURNING id, grant_name, source_url, funding_amount, deadline, application_difficulty,
                           priority_score, status, created_at, updated_at
                 """,
                 (
                     values["grant_name"],
+                    values["source_url"],
                     values["funding_amount"],
                     values["deadline"],
                     values["application_difficulty"],

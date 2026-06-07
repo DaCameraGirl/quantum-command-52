@@ -150,13 +150,15 @@ def write_outputs(grants: list[Grant]) -> None:
     for index, grant in enumerate(grants[:20], start=1):
         row = grant.row
         amount = row.get("amount_max", "").strip() or "unknown amount"
+        source_url = row.get("source_url", "").strip()
+        source = f"[Open official source]({source_url})" if source_url else "needs official URL"
         lines.extend(
             [
                 f"## {index}. {row.get('grant_name', 'Unnamed grant')}",
                 f"- Score: {grant.score:.1f}",
                 f"- Amount max: {amount}",
                 f"- Deadline: {row.get('deadline', '').strip() or 'unknown'}",
-                f"- Source: {row.get('source_url', '').strip() or 'needs official URL'}",
+                f"- Source: {source}",
                 f"- Action: {grant.action}",
                 f"- Notes: {row.get('notes', '').strip() or 'none'}",
                 "",
@@ -175,17 +177,17 @@ def init_file() -> None:
         writer.writeheader()
         writer.writerow(
             {
-                "grant_name": "Sample Emergency Aid Fund",
-                "source_url": "https://example.org/official-application",
-                "amount_min": "500",
-                "amount_max": "2500",
-                "deadline": "2026-07-15",
-                "eligibility": "Adults with urgent housing, school, or safety expenses",
-                "women_focused": "yes",
+                "grant_name": "Modest Needs Self-Sufficiency Grant",
+                "source_url": "https://www.modestneeds.org/mn/about-us/grants/self-sufficiency-grants",
+                "amount_min": "0",
+                "amount_max": "1000",
+                "deadline": "",
+                "eligibility": "Working households facing a short-term emergency expense",
+                "women_focused": "no",
                 "emergency_funding": "yes",
                 "no_cosigner": "yes",
                 "status": "research",
-                "notes": "Replace this sample with a real official source.",
+                "notes": "Official program page; application availability and eligibility can change.",
             }
         )
     print(f"Created {DATA_FILE}")

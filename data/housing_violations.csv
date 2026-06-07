@@ -1,5 +1,7 @@
-date,landlord,property,issue,severity,status,penalty,evidence_file,notes
-2026-06-01,Sample Landlord,123 Main St,No hot water,9,unresolved,500,photos/hot-water.jpg,Replace with real records.
-2026-06-03,Sample Landlord,123 Main St,Unsafe lock,8,unresolved,250,photos/lock.jpg,Ask for written repair timeline.
-2026-05-20,Sample Landlord,123 Main St,Paint damage,3,resolved,0,,Low priority example.
+date,landlord,property,issue,severity,status,penalty,evidence_file,source_url,notes
+2026-06-07,HUD,National resource,Find emergency shelter and local services,10,open,0,,https://www.hud.gov/FindShelter,Official HUD shelter food health and clothing resource finder.
+2026-06-07,USAGov,National resource,Emergency housing and homelessness help,10,open,0,,https://www.usa.gov/emergency-housing,Official USAGov emergency housing guide.
+2026-06-07,Legal Services Corporation,National resource,Find local civil legal aid for housing issues,8,open,0,,https://www.lsc.gov/about-lsc/what-legal-aid/i-need-legal-help,Official LSC legal aid locator.
+2026-06-07,211,Local referral resource,Housing utilities food and crisis referrals,8,open,0,,https://www.211.org/get-help/housing-expenses?hl=en-US,Search or call 211 for local housing and basic-needs referrals.
+2026-06-07,HUD Housing Counseling,National resource,Find a HUD-approved housing counselor,7,open,0,,https://www.hud.gov/counseling,Official HUD housing counseling search.
 

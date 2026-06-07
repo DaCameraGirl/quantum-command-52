@@ -21,6 +21,7 @@ FIELDS = [
     "status",
     "penalty",
     "evidence_file",
+    "source_url",
     "notes",
 ]
 
@@ -78,6 +79,8 @@ def summarize(min_severity: float) -> None:
 
     lines.extend(["", "## Urgent Issues"])
     for row in urgent:
+        source_url = row.get("source_url", "").strip()
+        source = f"[Open source]({source_url})" if source_url else "not attached"
         lines.extend(
             [
                 f"### {row.get('date', 'unknown date')} - {row.get('issue', 'unknown issue')}",
@@ -85,6 +88,7 @@ def summarize(min_severity: float) -> None:
                 f"- Landlord: {row.get('landlord', '').strip() or 'unknown'}",
                 f"- Severity: {row.get('severity', '').strip() or 'unknown'}",
                 f"- Evidence: {row.get('evidence_file', '').strip() or 'not attached'}",
+                f"- Source: {source}",
                 f"- Notes: {row.get('notes', '').strip() or 'none'}",
                 "",
             ]

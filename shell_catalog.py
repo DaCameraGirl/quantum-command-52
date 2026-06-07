@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parent
 DATA_FILE = ROOT / "data" / "shell_items.csv"
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_CSV = OUTPUT_DIR / "shell_catalog_estimates.csv"
+OUTPUT_MD = OUTPUT_DIR / "shell_catalog_estimates.md"
 
 FIELDS = [
     "item_name",
@@ -17,6 +18,7 @@ FIELDS = [
     "rarity_score",
     "comparable_low",
     "comparable_high",
+    "source_url",
     "notes",
 ]
 
@@ -62,7 +64,29 @@ def estimate() -> None:
         writer = csv.DictWriter(handle, fieldnames=[*FIELDS, "estimated_value", "confidence", "next_action"])
         writer.writeheader()
         writer.writerows(results)
+    lines = [
+        "# Catalog Value Estimates",
+        "",
+        "Use these as starting estimates only. Verify condition, comparable-sale date, and exact model before pricing.",
+        "",
+    ]
+    for row in results:
+        source_url = row.get("source_url", "").strip()
+        source = f"[Open comparable source]({source_url})" if source_url else "needs comparable source"
+        lines.extend(
+            [
+                f"## {row.get('item_name', 'Unknown item')}",
+                f"- Estimated value: ${row['estimated_value']}",
+                f"- Confidence: {row['confidence']}",
+                f"- Source: {source}",
+                f"- Next action: {row['next_action']}",
+                f"- Notes: {row.get('notes', '').strip() or 'none'}",
+                "",
+            ]
+        )
+    OUTPUT_MD.write_text("\n".join(lines), encoding="utf-8")
     print(f"Wrote {OUTPUT_CSV}")
+    print(f"Wrote {OUTPUT_MD}")
 
 
 def main() -> None:

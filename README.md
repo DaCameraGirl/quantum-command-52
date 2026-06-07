@@ -1,15 +1,26 @@
-# Angela Practical Funding Toolkit
+# ⚛️ Quantum Command 52
 
-This repo replaces the fake "quantum grant" code with practical local tools.
+Quantum Command 52 is a local-first IBM/Qiskit quantum lab with practical resource ledgers attached.
 
-It does not guarantee money, file legal claims, or appraise collectibles. It helps you organize real opportunities, evidence, and comparable sale data so you can take the next useful step.
+It is **not** a Stripe checkout app, not a real-estate demo, and not a promise that money, benefits, housing, or legal outcomes are guaranteed. It is meant to help organize real links, real notes, and quantum experiments in one place.
 
-## Quick Start
+📌 Latest cleanup notes: [CHANGELOG_REPO52_CLEANUP.md](CHANGELOG_REPO52_CLEANUP.md)
+
+## 🧭 What This Is For
+
+- ⚛️ Run and inspect IBM/Qiskit quantum experiments.
+- 🎯 Rank grant, scholarship, emergency aid, and benefit leads.
+- 🏠 Track housing help, legal aid, shelter, and referral resources.
+- 🔗 Keep official source links clickable instead of buried in notes.
+- 📦 Catalog items with comparable-source links.
+- 🧪 Keep paper-market/portfolio experiments clearly marked as research only.
+
+## 🚀 Quick Start
 
 Run these from PowerShell:
 
 ```powershell
-cd C:\Users\enter\angela-practical-funding-toolkit
+cd C:\Users\enter\OneDrive\Desktop\Repo52\quantum-command-52
 python grants.py rank
 python housing_violations.py summarize
 python shell_catalog.py estimate
@@ -18,49 +29,90 @@ python qml_signal_engine.py --capital 1000
 python strict_macro_quantum_v10.py --preflight
 ```
 
-The scripts write results into the `output` folder.
+Outputs are written into the `output` folder.
 
-## Files
+## 🖥️ Desktop Shortcut
 
-- `grants.py` ranks grant/scholarship/emergency aid opportunities from `data/grants.csv`.
-- `housing_violations.py` summarizes unresolved housing issues from `data/housing_violations.csv`.
-- `shell_catalog.py` estimates collectible ranges only from comparable sale values you provide in `data/shell_items.csv`.
-- `quantum_portfolio.py` runs a local quantum-inspired paper portfolio optimizer from `data/portfolio_assets.csv`.
-- `qml_signal_engine.py` runs a local QML-shaped paper signal engine from `data/market_features.csv`.
-- `strict_macro_quantum_v10.py` is the hard-dependency IBM/Qiskit/yfinance/Torch version. It fails fast if the enterprise stack, `.env` token, live market data, or IBM Runtime connection is unavailable.
-- `web-dashboard/` is a React/Tailwind/Recharts command center with PostgreSQL-backed user authentication, portfolio telemetry, grants, housing evidence, physical inventory, and real estate transaction pipeline views.
-- `PROJECT_LOG.md` records the release history for each major GitHub push.
+The desktop shortcut named `52` launches the local dashboard.
 
-## Alpaca Paper Trading
-
-The strict V10 script can create Alpaca paper-trading order previews and, with an explicit flag, submit paper market buy orders. Live trading mode is intentionally blocked.
-
-Add paper credentials to `.env`:
+It points to:
 
 ```text
-ALPACA_API_KEY=your_paper_key
-ALPACA_SECRET_KEY=your_paper_secret
-ALPACA_PAPER=true
+Start-Repo52.ps1
 ```
 
-Preview paper orders:
+That script starts:
 
-```powershell
-py -3.11 strict_macro_quantum_v10.py --bankroll 500000 --preview-alpaca-orders
+- 🔌 Backend API: `http://127.0.0.1:8787`
+- 🌐 Frontend dashboard: `http://127.0.0.1:5173`
+
+The shortcut uses the custom icon:
+
+```text
+assets/repo52-52.ico
 ```
 
-Submit paper orders:
+## 🧩 Dashboard Tabs
+
+The cleaned app shows:
+
+- 🎓 **Grants**: official aid, scholarship, emergency resource, and benefit links.
+- 🏠 **Housing**: shelter, legal aid, counseling, 211, and housing evidence tracking.
+- 📦 **Catalog**: item/value research with comparable-source links.
+- ⚛️ **Quantum**: IBM/Qiskit and local paper-research tooling.
+
+Removed from the visible app:
+
+- 💳 Billing / Stripe checkout.
+- 🏘️ Real-estate Deals demo.
+- 💸 Fake `$500,000` command-capital language.
+
+## 📁 Main Files
+
+- `grants.py`: ranks grant and help-resource leads from `data/grants.csv`.
+- `housing_violations.py`: writes a housing/help summary from `data/housing_violations.csv`.
+- `shell_catalog.py`: estimates catalog values from comparable ranges in `data/shell_items.csv`.
+- `quantum_portfolio.py`: local quantum-inspired paper portfolio optimizer.
+- `qml_signal_engine.py`: local QML-shaped paper signal engine.
+- `strict_macro_quantum_v10.py`: strict IBM/Qiskit/yfinance/Torch pipeline.
+- `web-dashboard/`: React dashboard and Python API server.
+- `IBM_QUANTUM_TOKEN_GUIDE.md`: IBM Quantum token setup notes.
+- `PROJECT_LOG.md`: project history.
+
+## 🔐 IBM Quantum Notes
+
+The strict V10 script expects real enterprise dependencies and IBM Runtime access.
+
+Run a preflight check:
 
 ```powershell
-py -3.11 strict_macro_quantum_v10.py --bankroll 500000 --preview-alpaca-orders --submit-paper-orders
+py -3.11 strict_macro_quantum_v10.py --preflight
 ```
 
-## Web Dashboard
+Keep secrets in `.env`. Do not commit real IBM, Alpaca, database, or other private keys.
 
-Install and run the dashboard:
+## 📈 Alpaca Paper Research
+
+The strict V10 script can preview Alpaca paper-trading orders. Live trading is intentionally blocked.
+
+Example paper preview:
 
 ```powershell
-cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
+py -3.11 strict_macro_quantum_v10.py --bankroll 1000 --preview-alpaca-orders
+```
+
+Example paper submit:
+
+```powershell
+py -3.11 strict_macro_quantum_v10.py --bankroll 1000 --preview-alpaca-orders --submit-paper-orders
+```
+
+## 🌐 Web Dashboard Setup
+
+Install and run manually:
+
+```powershell
+cd C:\Users\enter\OneDrive\Desktop\Repo52\quantum-command-52\web-dashboard
 npm install
 py -3.11 -m pip install -r requirements.txt
 py -3.11 server.py
@@ -69,13 +121,37 @@ py -3.11 server.py
 In a second PowerShell window:
 
 ```powershell
-cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
+cd C:\Users\enter\OneDrive\Desktop\Repo52\quantum-command-52\web-dashboard
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`.
+Open:
 
-The API now requires PostgreSQL. Set this in the repo `.env` before starting `server.py`:
+```text
+http://127.0.0.1:5173
+```
+
+## 🧪 Local Demo Mode
+
+The shortcut starts the backend with:
+
+```text
+REPO52_DEMO_MODE=true
+APP_ENV=development
+REQUIRE_ALEMBIC_MIGRATIONS=false
+```
+
+That mode skips PostgreSQL and uses the ignored local database:
+
+```text
+web-dashboard/data.db
+```
+
+Delete that ignored file only if you want to reset local demo rows.
+
+## 🗄️ Production Database
+
+For non-demo backend runs, set `.env` values such as:
 
 ```text
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/quantum_command_52
@@ -87,80 +163,14 @@ RATE_LIMIT_AUTH_PER_MINUTE=12
 RATE_LIMIT_API_PER_MINUTE=120
 ```
 
-The backend validates runtime configuration through `web-dashboard/app_config.py` using Pydantic. Database URLs and JWT secrets are stored as secret fields, redacted in normal representation, and rejected early if required values are missing or malformed.
-
-### Local Demo Shortcut
-
-The desktop shortcut and `Start-Repo52.ps1` start the backend with:
-
-```text
-REPO52_DEMO_MODE=true
-APP_ENV=development
-REQUIRE_ALEMBIC_MIGRATIONS=false
-```
-
-That mode skips the PostgreSQL socket connection and serves thread-safe in-memory demo data for portfolio, grants, housing, inventory, and real estate transactions. It is for local dashboard preview only; it does not persist changes after the backend window closes. `server.py` rejects demo mode when `APP_ENV=production`.
-
-## Stripe Webhooks
-
-Set Stripe billing secrets before enabling subscription billing:
-
-```text
-STRIPE_SECRET_KEY=sk_live_replace_with_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=whsec_replace_with_stripe_endpoint_secret
-STRIPE_SUCCESS_URL=https://your-domain.example/?checkout=success
-STRIPE_CANCEL_URL=https://your-domain.example/?checkout=cancelled
-STRIPE_PRICE_STARTER=price_replace_with_starter_price_id
-STRIPE_PRICE_PRO=price_replace_with_pro_price_id
-STRIPE_PRICE_ENTERPRISE=price_replace_with_enterprise_price_id
-```
-
-The backend exposes authenticated `POST /api/stripe/checkout`. The browser sends a tier (`starter`, `pro`, or `enterprise`), the server maps it to a configured Stripe Price ID, and Stripe returns a Checkout redirect URL. The browser never chooses arbitrary price IDs.
-
-The React dashboard includes a Billing tab that calls this endpoint and redirects the signed-in user to Stripe's hosted Checkout page.
-
-The backend exposes `POST /api/stripe/webhook`. It verifies the `Stripe-Signature` header, records every accepted event in `stripe_webhook_events`, and updates `billing_accounts` for checkout, subscription, payment-failed, and subscription-paused events.
-
-## API Contract
-
-The API contract lives at `web-dashboard/openapi.json` and is served by the backend at:
-
-- `http://127.0.0.1:8787/openapi.json`
-- `http://127.0.0.1:8787/api/openapi.json`
-
-Authenticated routes accept either the `access_token` JWT cookie or a bearer JWT in the `Authorization` header. Every JSON response includes an `X-Request-ID` correlation header for tracing logs back to a specific request.
-
-## Database Migrations
-
-The backend still has a startup schema initializer for local development compatibility, but production mode is Alembic-only. When `APP_ENV=production` or `REQUIRE_ALEMBIC_MIGRATIONS=true`, `server.py` skips the legacy `init_db()` fallback and refuses to boot unless the expected Alembic revision is present.
-
 Run migrations from PowerShell:
 
 ```powershell
-cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
+cd C:\Users\enter\OneDrive\Desktop\Repo52\quantum-command-52\web-dashboard
 py -3.11 -m alembic upgrade head
 ```
 
-Create the next migration after a schema change:
-
-```powershell
-py -3.11 -m alembic revision -m "describe schema change"
-```
-
-Seed the real estate transaction board for registered users:
-
-```powershell
-cd C:\Users\enter\angela-practical-funding-toolkit\web-dashboard
-py -3.11 seed_transactions.py
-```
-
-Seed one user by email:
-
-```powershell
-py -3.11 seed_transactions.py --email user@example.com
-```
-
-## Docker Deployment
+## 🐳 Docker
 
 Copy the production example and set strong secrets:
 
@@ -168,7 +178,7 @@ Copy the production example and set strong secrets:
 Copy-Item .env.production.example .env.production
 ```
 
-Then start the full local stack:
+Start the stack:
 
 ```powershell
 docker compose --env-file .env.production up --build
@@ -178,22 +188,20 @@ Services:
 
 - App and API: `http://127.0.0.1:8080`
 - PostgreSQL: internal Docker network with persistent `postgres_data` volume
-- Migration job: `migrate` runs `alembic upgrade head` before the app starts
+- Migration job: `migrate` runs `alembic upgrade head`
 
-The production `Dockerfile` is a monorepo multi-stage build. Stage 1 compiles the React/Vite dashboard; Stage 2 installs the Python API dependencies, copies the compiled dashboard assets, and serves both the frontend and `/api/*` routes from one hardened runtime container.
-
-The Vite production build uses manual Rollup chunks for React, Recharts/D3, Lucide icons, and remaining vendor modules so dashboard bundles stay split by dependency family.
-
-## How To Use For Real
+## ✅ Use It For Real
 
 1. Open the CSV files in `data`.
-2. Replace the sample rows with real opportunities, violations, or items.
-3. Run the matching script.
-4. Use the generated files in `output` as your call list, application tracker, or evidence packet.
+2. Add real opportunities, resources, evidence, or items.
+3. Keep official URLs in the `source_url` columns.
+4. Run the matching script.
+5. Use the generated Markdown/CSV files in `output`.
 
-## Important Limits
+## 🚧 Limits
 
-- No script can guarantee a grant, settlement, or sale price.
-- No script is financial advice or a trading bot.
-- Do not send private documents to random websites.
-- For legal action, use the housing summary as an organizer and talk to a qualified tenant/legal aid office.
+- No script guarantees a grant, benefit, settlement, or sale price.
+- No script is legal advice.
+- No script is financial advice.
+- No script should receive private documents from strangers or random websites.
+- Housing/legal summaries are organizers; talk to a qualified legal aid or tenant-rights office for action.

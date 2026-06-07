@@ -9,3 +9,4 @@ web-dashboard/node_modules/
 web-dashboard/dist/
 web-dashboard/*.db
 web-dashboard/*.db-*
+web-dashboard/*.log

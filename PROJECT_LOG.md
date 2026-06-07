@@ -2,7 +2,7 @@
 
 Repository: `DaCameraGirl/quantum-command-52`
 
-Local workspace: `C:\Users\enter\angela-practical-funding-toolkit`
+Local workspace: `C:\Users\enter\OneDrive\Desktop\Repo52\quantum-command-52`
 
 This log records the build history for Repo 52 in plain operational language. It is intentionally separate from raw Git history so a reviewer can understand what each push added, what was verified, and what remains unfinished.
 

@@ -2,7 +2,7 @@ $ErrorActionPreference = "Continue"
 
 $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DashboardRoot = Join-Path $RepoRoot "web-dashboard"
-$DashboardUrl = "http://127.0.0.1:5173"
+$DashboardUrl = "http://127.0.0.1:5173/?repo52=" + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
 function Stop-Repo52PortListeners {
     param(

@@ -1,4 +1,5 @@
-item_name,image_path,condition,rarity_score,comparable_low,comparable_high,notes
-Sample Shell,photos/sample-shell.jpg,good,6,25,80,Replace with actual comparable completed sale values.
-Unidentified Beach Find,photos/beach-find.jpg,unknown,5,0,0,Needs identification before pricing.
+item_name,image_path,condition,rarity_score,comparable_low,comparable_high,source_url,notes
+Nikon Z6 II Camera Kit,,good,4,900,1500,https://www.mpb.com/en-us/product/nikon-z6-ii,Comparable source for used camera-body pricing; verify shutter count accessories and condition.
+Canon EF 50mm f/1.8 STM Lens,,good,3,70,130,https://www.mpb.com/en-us/product/canon-ef-50mm-f-1-8-stm,Comparable source for used lens pricing; verify mount caps optics and condition.
+Unidentified Collectible Item,,unknown,5,0,0,https://pages.ebay.com/ga/en-us/completedlistings/,Use completed listings only and update search terms to match the real item.
 

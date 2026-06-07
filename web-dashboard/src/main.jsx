@@ -4,14 +4,10 @@ import {
   AlertTriangle,
   ArrowRight,
   BarChart3,
-  Building2,
   Boxes,
-  CalendarClock,
   CheckCircle2,
   CircuitBoard,
-  CreditCard,
   Database,
-  DollarSign,
   ExternalLink,
   FileSearch,
   Gauge,
@@ -21,7 +17,6 @@ import {
   Landmark,
   Lock,
   LogOut,
-  MapPin,
   PieChart,
   Plus,
   Printer,
@@ -50,135 +45,6 @@ import {
 import "./styles.css";
 
 const COLORS = ["#38bdf8", "#22c55e", "#f97316", "#a78bfa", "#f43f5e", "#facc15"];
-const COMMAND_CAPITAL = 500000;
-
-const PIPELINE_DEALS = [
-  {
-    id: "TX-1042",
-    stage: "listing",
-    address: "418 Harbor View Lane",
-    city: "Charleston",
-    state: "SC",
-    price: 485000,
-    agent: "Angela",
-    client: "Seller file",
-    escrow: "Pending offer",
-    earnestMoney: 0,
-    closingOffset: 42,
-    milestones: [
-      { name: "Seller disclosure packet", offset: 2, completed: false, critical: true },
-      { name: "MLS photo review", offset: 4, completed: false, critical: false },
-      { name: "Offer review window", offset: 9, completed: false, critical: true },
-    ],
-  },
-  {
-    id: "TX-1077",
-    stage: "under_contract",
-    address: "92 Cedar Mill Court",
-    city: "Raleigh",
-    state: "NC",
-    price: 612500,
-    agent: "Angela",
-    client: "Buyer file",
-    escrow: "Atlantic Title",
-    earnestMoney: 18500,
-    closingOffset: 28,
-    milestones: [
-      { name: "Inspection contingency", offset: 1, completed: false, critical: true },
-      { name: "Appraisal ordered", offset: 5, completed: false, critical: true },
-      { name: "Loan approval deadline", offset: 13, completed: false, critical: true },
-    ],
-  },
-  {
-    id: "TX-1091",
-    stage: "under_contract",
-    address: "733 Market Row",
-    city: "Atlanta",
-    state: "GA",
-    price: 748000,
-    agent: "Angela",
-    client: "Investor file",
-    escrow: "Secure Escrow Co.",
-    earnestMoney: 25000,
-    closingOffset: 18,
-    milestones: [
-      { name: "HOA document review", offset: -1, completed: false, critical: true },
-      { name: "Financing condition", offset: 6, completed: false, critical: true },
-      { name: "Final walkthrough", offset: 16, completed: false, critical: false },
-    ],
-  },
-  {
-    id: "TX-1103",
-    stage: "closing",
-    address: "1509 Ridgecrest Avenue",
-    city: "Nashville",
-    state: "TN",
-    price: 524900,
-    agent: "Angela",
-    client: "Relocation file",
-    escrow: "Keystone Settlement",
-    earnestMoney: 16000,
-    closingOffset: 5,
-    milestones: [
-      { name: "Clear to close", offset: 0, completed: false, critical: true },
-      { name: "Wire instructions verified", offset: 2, completed: false, critical: true },
-      { name: "Closing appointment", offset: 5, completed: false, critical: true },
-    ],
-  },
-  {
-    id: "TX-1019",
-    stage: "closed",
-    address: "21 Maple Station Drive",
-    city: "Charlotte",
-    state: "NC",
-    price: 389000,
-    agent: "Angela",
-    client: "Closed buyer file",
-    escrow: "Closed",
-    earnestMoney: 12000,
-    closingOffset: -8,
-    milestones: [
-      { name: "Inspection contingency", offset: -27, completed: true, critical: true },
-      { name: "Loan approval deadline", offset: -18, completed: true, critical: true },
-      { name: "Recorded closing", offset: -8, completed: true, critical: true },
-    ],
-  },
-];
-
-const PIPELINE_COLUMNS = [
-  { id: "listing", title: "Listing", tone: "blue" },
-  { id: "under_contract", title: "Under Contract", tone: "orange" },
-  { id: "closing", title: "Closing", tone: "violet" },
-  { id: "closed", title: "Closed", tone: "green" },
-];
-
-function shiftedDate(offsetDays) {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + offsetDays);
-  return date;
-}
-
-function formatShortDate(date) {
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function daysUntil(date) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  return Math.round((target - today) / 86400000);
-}
-
-function milestoneRisk(milestone) {
-  if (milestone.completed) return "complete";
-  const days = daysUntil(milestone.dueDate);
-  if (days < 0) return "breach";
-  if (milestone.critical && days <= 2) return "critical";
-  if (days <= 7) return "watch";
-  return "clear";
-}
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -212,25 +78,38 @@ function AuthPanel({ onAuth }) {
     }
   }
 
+  async function openDemo() {
+    setError("");
+    try {
+      const payload = await api("/api/login", {
+        method: "POST",
+        body: JSON.stringify({ email: "demo@repo52.local", password: "demo-password" }),
+      });
+      onAuth(payload.user);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <main className="auth-shell">
       <section className="auth-aside">
         <div className="brand-mark">
           <CircuitBoard size={24} />
         </div>
-        <p className="eyebrow">Data-Analytics command access</p>
-        <h1>Macro Asset Command Center</h1>
+        <p className="eyebrow">Repo 52</p>
+        <h1>Quantum Command 52</h1>
         <p className="auth-copy">
-          Secure entry for portfolio telemetry, quantum model outputs, and practical intelligence tools.
+          IBM/Qiskit quantum experiments with real grant, housing, legal aid, and resource-link ledgers.
         </p>
         <div className="security-grid">
           <div className="security-row">
             <ShieldCheck size={18} />
-            <span>JWT authorization</span>
+            <span>Clickable official-source links</span>
           </div>
           <div className="security-row">
             <Lock size={18} />
-            <span>PostgreSQL identity layer</span>
+            <span>Local demo mode available</span>
           </div>
         </div>
       </section>
@@ -266,7 +145,10 @@ function AuthPanel({ onAuth }) {
           </label>
           {error && <div className="error-line">{error}</div>}
           <button className="primary-action" type="submit">
-            {mode === "login" ? "Enter command" : "Create account"} <ArrowRight size={18} />
+            {mode === "login" ? "Sign in" : "Create account"} <ArrowRight size={18} />
+          </button>
+          <button className="ghost-button demo-login-button" onClick={openDemo} type="button">
+            Open local demo
           </button>
         </form>
       </section>
@@ -292,257 +174,6 @@ function StatusPill({ status }) {
   return <span className={`status-pill ${normalized}`}>{status}</span>;
 }
 
-function TransactionPipelineBoard() {
-  const [sourceDeals, setSourceDeals] = useState(PIPELINE_DEALS);
-  const [summary, setSummary] = useState({
-    activeDealValue: 0,
-    earnestExposure: 0,
-    deadlineBreachCount: 0,
-    dueThisWeekCount: 0,
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  async function loadTransactions() {
-    setError("");
-    setLoading(true);
-    try {
-      const payload = await api("/api/transactions");
-      setSourceDeals(payload.deals || []);
-      setSummary(payload.summary || {});
-    } catch (err) {
-      setError(`${err.message}. Showing local sample transaction data.`);
-      setSourceDeals(PIPELINE_DEALS);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadTransactions();
-  }, []);
-
-  async function moveDealStage(deal, newStage) {
-    if (deal.stage === newStage) return;
-    const originalDeals = sourceDeals;
-    setError("");
-    setSourceDeals((currentDeals) =>
-      currentDeals.map((item) =>
-        item.transactionId === deal.transactionId || item.id === deal.id
-          ? { ...item, stage: newStage }
-          : item,
-      ),
-    );
-
-    try {
-      await api(`/api/transactions/${deal.transactionId || deal.id}/stage`, {
-        method: "PATCH",
-        body: JSON.stringify({ stage: newStage }),
-      });
-      await loadTransactions();
-    } catch (err) {
-      setSourceDeals(originalDeals);
-      setError(`Stage update failed: ${err.message}`);
-    }
-  }
-
-  const deals = useMemo(
-    () =>
-      sourceDeals.map((deal) => {
-        const closingDate = deal.closingDate ? new Date(deal.closingDate) : shiftedDate(deal.closingOffset || 0);
-        const milestones = (deal.milestones || []).map((milestone) => {
-          const dueDate = milestone.dueDate ? new Date(milestone.dueDate) : shiftedDate(milestone.offset || 0);
-          return {
-            ...milestone,
-            name: milestone.name || milestone.milestone_name,
-            dueDate,
-            dueIn: daysUntil(dueDate),
-            completed: Boolean(milestone.completed),
-            critical: Boolean(milestone.critical),
-          };
-        });
-        const openCritical = milestones.filter((milestone) => milestone.critical && !milestone.completed);
-        const nextMilestone = milestones
-          .filter((milestone) => !milestone.completed)
-          .sort((a, b) => a.dueDate - b.dueDate)[0];
-        const worstRisk = milestones.reduce((current, milestone) => {
-          const risk = milestoneRisk(milestone);
-          const rank = { complete: 0, clear: 1, watch: 2, critical: 3, breach: 4 };
-          return rank[risk] > rank[current] ? risk : current;
-        }, "complete");
-
-        return {
-          ...deal,
-          closingDate,
-          milestones,
-          price: Number(deal.price || 0),
-          earnestMoney: Number(deal.earnestMoney || 0),
-          openCriticalCount: openCritical.length,
-          nextMilestone,
-          risk: worstRisk,
-        };
-      }),
-    [sourceDeals],
-  );
-
-  const activeDeals = deals.filter((deal) => deal.stage !== "closed");
-  const dealValue = Number(summary.activeDealValue || activeDeals.reduce((total, deal) => total + deal.price, 0));
-  const earnestExposure = Number(summary.earnestExposure || activeDeals.reduce((total, deal) => total + deal.earnestMoney, 0));
-  const breachedMilestones = deals.flatMap((deal) => deal.milestones.filter((milestone) => milestoneRisk(milestone) === "breach"));
-  const dueSoon = deals.flatMap((deal) => deal.milestones.filter((milestone) => !milestone.completed && milestone.dueIn >= 0 && milestone.dueIn <= 7));
-  const timelineData = deals
-    .filter((deal) => deal.stage !== "closed")
-    .map((deal) => ({
-      name: deal.id.replace("TX-", "#"),
-      days: Math.max(daysUntil(deal.closingDate), 0),
-      value: Math.round(deal.price / 1000),
-    }));
-
-  return (
-    <section className="transaction-room">
-      <div className="grant-head">
-        <div>
-          <p className="eyebrow">Real estate transaction control</p>
-          <h2>Deal Pipeline Board</h2>
-          <p>Stage tracking for listings, active contracts, closing files, and contingency windows.</p>
-        </div>
-        <button className="ghost-button" onClick={loadTransactions} type="button">
-          <CalendarClock size={16} /> Refresh audit
-        </button>
-      </div>
-
-      {error && <div className="error-line">{error}</div>}
-      {loading && <div className="grant-empty">Loading transaction pipeline from PostgreSQL...</div>}
-
-      <div className="grant-summary-grid">
-        <HudCard icon={Building2} label="Active deal value" value={`$${dealValue.toLocaleString()}`} detail={`${activeDeals.length} open files`} tone="blue" />
-        <HudCard icon={DollarSign} label="Earnest exposure" value={`$${earnestExposure.toLocaleString()}`} detail="deposit at risk" tone="orange" />
-        <HudCard icon={AlertTriangle} label="Deadline breaches" value={summary.deadlineBreachCount ?? breachedMilestones.length} detail="requires action" tone="violet" />
-        <HudCard icon={CheckCircle2} label="Due this week" value={summary.dueThisWeekCount ?? dueSoon.length} detail="open milestones" tone="green" />
-      </div>
-
-      <section className="deal-intel-grid">
-        <div className="transaction-chart">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Closing runway</p>
-              <h2>Days Until Target Close</h2>
-            </div>
-            <BarChart3 size={18} />
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={timelineData}>
-              <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
-              <XAxis dataKey="name" stroke="#7c8aa5" />
-              <YAxis stroke="#7c8aa5" />
-              <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
-              <Bar dataKey="days" fill="#38bdf8" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="deadline-ledger">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Critical windows</p>
-              <h2>Contingency Ledger</h2>
-            </div>
-            <AlertTriangle size={18} />
-          </div>
-          {deals
-            .flatMap((deal) =>
-              deal.milestones.map((milestone) => ({
-                ...milestone,
-                dealId: deal.id,
-                address: deal.address,
-                risk: milestoneRisk(milestone),
-              })),
-            )
-            .sort((a, b) => a.dueDate - b.dueDate)
-            .slice(0, 7)
-            .map((milestone) => (
-              <div className={`deadline-row ${milestone.risk}`} key={`${milestone.dealId}-${milestone.name}`}>
-                <div>
-                  <strong>{milestone.name}</strong>
-                  <span>{milestone.dealId} / {milestone.address}</span>
-                </div>
-                <div>
-                  <b>{formatShortDate(milestone.dueDate)}</b>
-                  <StatusPill status={milestone.risk} />
-                </div>
-              </div>
-            ))}
-        </div>
-      </section>
-
-      <section className="pipeline-board" aria-label="Real estate transaction pipeline board">
-        {PIPELINE_COLUMNS.map((column) => {
-          const columnDeals = deals.filter((deal) => deal.stage === column.id);
-          return (
-            <div
-              className={`pipeline-column ${column.tone}`}
-              key={column.id}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                const transactionId = event.dataTransfer.getData("text/plain");
-                const draggedDeal = deals.find((deal) => String(deal.transactionId || deal.id) === transactionId);
-                if (draggedDeal) moveDealStage(draggedDeal, column.id);
-              }}
-            >
-              <div className="pipeline-column-head">
-                <h3>{column.title}</h3>
-                <span>{columnDeals.length}</span>
-              </div>
-              {columnDeals.map((deal) => (
-                <article
-                  className={`deal-card ${deal.risk}`}
-                  draggable
-                  key={deal.id}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", String(deal.transactionId || deal.id));
-                  }}
-                >
-                  <div className="deal-card-head">
-                    <div>
-                      <p className="eyebrow">{deal.id}</p>
-                      <h4>{deal.address}</h4>
-                    </div>
-                    <StatusPill status={deal.risk} />
-                  </div>
-                  <div className="deal-location">
-                    <MapPin size={14} />
-                    <span>{deal.city}, {deal.state}</span>
-                  </div>
-                  <div className="deal-metrics">
-                    <span>
-                      <b>${deal.price.toLocaleString()}</b>
-                      Contract value
-                    </span>
-                    <span>
-                      <b>{formatShortDate(deal.closingDate)}</b>
-                      Target close
-                    </span>
-                  </div>
-                  <div className="next-window">
-                    <span>{deal.nextMilestone?.name || "File complete"}</span>
-                    <strong>{deal.nextMilestone ? `${deal.nextMilestone.dueIn}d` : "Done"}</strong>
-                  </div>
-                  <div className="deal-foot">
-                    <small>{deal.escrow}</small>
-                    <small>{deal.openCriticalCount} critical open</small>
-                  </div>
-                </article>
-              ))}
-            </div>
-          );
-        })}
-      </section>
-    </section>
-  );
-}
-
 function GrantOptimizer() {
   const [grants, setGrants] = useState([]);
   const [summary, setSummary] = useState({ grantCount: 0, activeGrantCount: 0, totalFunding: 0, topPriorityScore: 0 });
@@ -550,6 +181,7 @@ function GrantOptimizer() {
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     grantName: "",
+    sourceUrl: "",
     fundingAmount: "5000",
     deadline: "",
     applicationDifficulty: "3",
@@ -588,6 +220,7 @@ function GrantOptimizer() {
       });
       setForm({
         grantName: "",
+        sourceUrl: "",
         fundingAmount: "5000",
         deadline: "",
         applicationDifficulty: "3",
@@ -606,6 +239,7 @@ function GrantOptimizer() {
         method: "PUT",
         body: JSON.stringify({
           grantName: grant.grant_name,
+          sourceUrl: grant.source_url || "",
           fundingAmount: Number(grant.funding_amount),
           deadline: grant.deadline || "",
           applicationDifficulty: Number(grant.application_difficulty),
@@ -634,8 +268,8 @@ function GrantOptimizer() {
       <div className="grant-head">
         <div>
           <p className="eyebrow">Live PostgreSQL module</p>
-          <h2>Grants Optimizer Ledger</h2>
-          <p>Authenticated CRUD with automatic priority scoring from amount, deadline, difficulty, and status.</p>
+          <h2>Grant & Help Resource Ledger</h2>
+          <p>Track official application links, benefit pages, deadlines, and priority scores from amount, urgency, difficulty, and status.</p>
         </div>
         <button className="ghost-button" onClick={loadGrants} type="button">
           <RefreshCw size={16} /> Refresh
@@ -645,8 +279,8 @@ function GrantOptimizer() {
       {error && <div className="error-line">{error}</div>}
 
       <div className="grant-summary-grid">
-        <HudCard icon={GraduationCap} label="Tracked grants" value={summary.grantCount || 0} detail="user ledger rows" tone="blue" />
-        <HudCard icon={CheckCircle2} label="Active grants" value={summary.activeGrantCount || 0} detail="not denied or archived" tone="green" />
+        <HudCard icon={GraduationCap} label="Tracked leads" value={summary.grantCount || 0} detail="user ledger rows" tone="blue" />
+        <HudCard icon={CheckCircle2} label="Active leads" value={summary.activeGrantCount || 0} detail="not denied or archived" tone="green" />
         <HudCard
           icon={Landmark}
           label="Funding pipeline"
@@ -659,8 +293,17 @@ function GrantOptimizer() {
 
       <form className="grant-form" onSubmit={submitGrant}>
         <label>
-          Grant name
+          Resource or grant name
           <input value={form.grantName} onChange={(event) => setForm({ ...form, grantName: event.target.value })} placeholder="Emergency education aid" />
+        </label>
+        <label>
+          Official source URL
+          <input
+            value={form.sourceUrl}
+            onChange={(event) => setForm({ ...form, sourceUrl: event.target.value })}
+            placeholder="https://official-site.org/apply"
+            type="url"
+          />
         </label>
         <label>
           Funding amount
@@ -711,10 +354,11 @@ function GrantOptimizer() {
           <span>Difficulty</span>
           <span>Priority</span>
           <span>Status</span>
+          <span>Source</span>
           <span></span>
         </div>
         {loading && <div className="grant-empty">Loading grant ledger...</div>}
-        {!loading && grants.length === 0 && <div className="grant-empty">No grants yet. Add the first opportunity above.</div>}
+        {!loading && grants.length === 0 && <div className="grant-empty">No leads yet. Add the first opportunity above.</div>}
         {!loading &&
           grants.map((grant) => (
             <div className="grant-row" key={grant.id}>
@@ -742,6 +386,22 @@ function GrantOptimizer() {
                 <option value="denied">Denied</option>
                 <option value="archived">Archived</option>
               </select>
+              {grant.source_url ? (
+                <a
+                  className="source-button"
+                  href={grant.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open official source for ${grant.grant_name}`}
+                  title="Open official source"
+                >
+                  <ExternalLink size={15} /> Open source
+                </a>
+              ) : (
+                <button className="source-button" disabled type="button" aria-label={`No official source URL for ${grant.grant_name}`} title="No official source URL">
+                  <ExternalLink size={15} /> No source
+                </button>
+              )}
               <button className="icon-button danger" onClick={() => deleteGrant(grant.id)} type="button" aria-label={`Delete ${grant.grant_name}`}>
                 <Trash2 size={16} />
               </button>
@@ -765,6 +425,7 @@ function HousingEvidenceVault() {
     resolveDate: "",
     severityLevel: "5",
     status: "open",
+    sourceUrl: "",
   });
 
   async function loadIncidents() {
@@ -804,6 +465,7 @@ function HousingEvidenceVault() {
         resolveDate: "",
         severityLevel: "5",
         status: "open",
+        sourceUrl: "",
       });
       await loadIncidents();
     } catch (err) {
@@ -824,6 +486,7 @@ function HousingEvidenceVault() {
           resolveDate: incident.resolve_date || "",
           severityLevel: Number(incident.severity_level),
           status: incident.status,
+          sourceUrl: incident.source_url || "",
           ...patch,
         }),
       });
@@ -848,8 +511,8 @@ function HousingEvidenceVault() {
       <div className="grant-head">
         <div>
           <p className="eyebrow">Evidence vault</p>
-          <h2>Housing Incident Timeline</h2>
-          <p>Authenticated incident tracking with days-unresolved calculations and severity-based violation flags.</p>
+          <h2>Housing Help & Evidence Timeline</h2>
+          <p>Track urgent housing evidence alongside official help, legal aid, and referral links.</p>
         </div>
         <div className="vault-actions">
           <button className="ghost-button" onClick={loadIncidents} type="button">
@@ -876,6 +539,11 @@ function HousingEvidenceVault() {
           <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
             <option>Maintenance</option>
             <option>Safety</option>
+            <option>Shelter</option>
+            <option>Emergency Housing</option>
+            <option>Legal Aid</option>
+            <option>Local Referral</option>
+            <option>Housing Counseling</option>
             <option>Utilities</option>
             <option>Pest</option>
             <option>Access</option>
@@ -885,6 +553,15 @@ function HousingEvidenceVault() {
         <label>
           Area / location
           <input value={form.areaLocation} onChange={(event) => setForm({ ...form, areaLocation: event.target.value })} placeholder="Kitchen ceiling" />
+        </label>
+        <label className="housing-source">
+          Help/source URL
+          <input
+            value={form.sourceUrl}
+            onChange={(event) => setForm({ ...form, sourceUrl: event.target.value })}
+            placeholder="https://www.hud.gov/FindShelter"
+            type="url"
+          />
         </label>
         <label>
           Request date
@@ -962,6 +639,22 @@ function HousingEvidenceVault() {
                     <option value="closed">Closed</option>
                   </select>
                 </label>
+                {incident.source_url ? (
+                  <a
+                    className="source-button"
+                    href={incident.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open source for ${incident.description}`}
+                    title="Open source"
+                  >
+                    <ExternalLink size={15} /> Open source
+                  </a>
+                ) : (
+                  <button className="source-button" disabled type="button" aria-label={`No source URL for ${incident.description}`} title="No source URL">
+                    <ExternalLink size={15} /> No source
+                  </button>
+                )}
                 <button className="icon-button danger" onClick={() => deleteIncident(incident.incident_id)} type="button" aria-label={`Delete incident ${incident.incident_id}`}>
                   <Trash2 size={16} />
                 </button>
@@ -983,6 +676,7 @@ function ItemCatalogEngine() {
     category: "Photography",
     estimatedMarketValue: "250",
     quantity: "1",
+    sourceUrl: "",
     notes: "",
   });
 
@@ -1021,6 +715,7 @@ function ItemCatalogEngine() {
         category: "Photography",
         estimatedMarketValue: "250",
         quantity: "1",
+        sourceUrl: "",
         notes: "",
       });
       await loadInventory();
@@ -1039,6 +734,7 @@ function ItemCatalogEngine() {
           category: item.category,
           estimatedMarketValue: Number(item.estimated_market_value),
           quantity: Number(item.quantity),
+          sourceUrl: item.source_url || "",
           notes: item.notes || "",
           ...patch,
         }),
@@ -1077,7 +773,7 @@ function ItemCatalogEngine() {
         <div>
           <p className="eyebrow">Physical asset engine</p>
           <h2>Item Catalog Valuation Grid</h2>
-          <p>Authenticated inventory records with live valuation totals by item, category, and quantity.</p>
+          <p>Authenticated inventory records with live valuation totals and clickable comparable-source links.</p>
         </div>
         <button className="ghost-button" onClick={loadInventory} type="button">
           <RefreshCw size={16} /> Refresh
@@ -1139,6 +835,15 @@ function ItemCatalogEngine() {
           <label className="inventory-notes">
             Notes
             <input value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Comparable source, condition, serial, location" />
+          </label>
+          <label className="inventory-source">
+            Comparable/source URL
+            <input
+              value={form.sourceUrl}
+              onChange={(event) => setForm({ ...form, sourceUrl: event.target.value })}
+              placeholder="https://www.mpb.com/en-us/product/..."
+              type="url"
+            />
           </label>
           <button className="primary-action" type="submit">
             <Plus size={17} /> Add asset
@@ -1202,139 +907,28 @@ function ItemCatalogEngine() {
                     step="1"
                   />
                 </label>
+                {item.source_url ? (
+                  <a
+                    className="source-button"
+                    href={item.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open source for ${item.item_name}`}
+                    title="Open source"
+                  >
+                    <ExternalLink size={15} /> Open source
+                  </a>
+                ) : (
+                  <button className="source-button" disabled type="button" aria-label={`No source URL for ${item.item_name}`} title="No source URL">
+                    <ExternalLink size={15} /> No source
+                  </button>
+                )}
                 <button className="icon-button danger" onClick={() => deleteItem(item.item_id)} type="button" aria-label={`Delete ${item.item_name}`}>
                   <Trash2 size={16} />
                 </button>
               </div>
             </article>
           ))}
-      </div>
-    </section>
-  );
-}
-
-const BILLING_TIERS = [
-  {
-    id: "starter",
-    name: "Starter",
-    price: "$49",
-    cadence: "monthly",
-    tone: "blue",
-    detail: "Single-operator command center with portfolio, grant, housing, inventory, and deal tracking.",
-    limits: ["1 command seat", "Core ledgers", "Stripe-hosted checkout"],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "$149",
-    cadence: "monthly",
-    tone: "green",
-    detail: "Expanded Data-Analytics workflow for active client files and recurring transaction reviews.",
-    limits: ["Priority transaction board", "Evidence and asset workflows", "Billing status sync"],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "Custom",
-    cadence: "contract",
-    tone: "violet",
-    detail: "Brokerage-scale controls for multi-tenant deployments, audit posture, and hardened infrastructure.",
-    limits: ["Multi-tenant deployment", "Migration-led database ops", "OpenAPI contract access"],
-  },
-];
-
-function BillingConsole() {
-  const [selectedTier, setSelectedTier] = useState("pro");
-  const [loadingTier, setLoadingTier] = useState("");
-  const [error, setError] = useState("");
-  const selectedPlan = BILLING_TIERS.find((tier) => tier.id === selectedTier) || BILLING_TIERS[1];
-
-  async function beginCheckout(tierId) {
-    setError("");
-    setSelectedTier(tierId);
-    setLoadingTier(tierId);
-    try {
-      const payload = await api("/api/stripe/checkout", {
-        method: "POST",
-        body: JSON.stringify({ tier: tierId }),
-      });
-      if (!payload.url) {
-        throw new Error("Stripe did not return a checkout URL.");
-      }
-      window.location.assign(payload.url);
-    } catch (err) {
-      setError(err.message);
-      setLoadingTier("");
-    }
-  }
-
-  return (
-    <section className="billing-console">
-      <div className="grant-head">
-        <div>
-          <p className="eyebrow">Stripe billing control</p>
-          <h2>Subscription Checkout Console</h2>
-          <p>Choose a Data-Analytics tier and launch the secure Stripe-hosted payment form from the authenticated backend.</p>
-        </div>
-        <div className="billing-seal">
-          <ShieldCheck size={18} />
-          <span>Server-mapped Price IDs</span>
-        </div>
-      </div>
-
-      {error && <div className="error-line">{error}</div>}
-
-      <div className="billing-layout">
-        <section className="billing-plans" aria-label="Subscription plans">
-          {BILLING_TIERS.map((tier) => (
-            <article className={`billing-plan ${tier.tone} ${selectedTier === tier.id ? "selected" : ""}`} key={tier.id}>
-              <div className="billing-plan-head">
-                <div>
-                  <p className="eyebrow">{tier.cadence}</p>
-                  <h3>{tier.name}</h3>
-                </div>
-                <strong>{tier.price}</strong>
-              </div>
-              <p>{tier.detail}</p>
-              <div className="billing-limits">
-                {tier.limits.map((limit) => (
-                  <span key={limit}>
-                    <CheckCircle2 size={15} /> {limit}
-                  </span>
-                ))}
-              </div>
-              <button className="primary-action" onClick={() => beginCheckout(tier.id)} type="button" disabled={Boolean(loadingTier)}>
-                {loadingTier === tier.id ? "Opening Stripe..." : "Start checkout"} <ExternalLink size={17} />
-              </button>
-            </article>
-          ))}
-        </section>
-
-        <aside className="checkout-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Checkout packet</p>
-              <h2>{selectedPlan.name} handoff</h2>
-            </div>
-            <CreditCard size={18} />
-          </div>
-          <div className="checkout-route">
-            <span>Browser action</span>
-            <strong>POST /api/stripe/checkout</strong>
-          </div>
-          <div className="checkout-route">
-            <span>Payload</span>
-            <strong>{`{ "tier": "${selectedPlan.id}" }`}</strong>
-          </div>
-          <div className="checkout-route">
-            <span>Security boundary</span>
-            <strong>JWT cookie required</strong>
-          </div>
-          <div className="checkout-route">
-            <span>Redirect target</span>
-            <strong>Stripe hosted session</strong>
-          </div>
-        </aside>
       </div>
     </section>
   );
@@ -1353,19 +947,11 @@ function ToolPanel({ activeTab }) {
     return <ItemCatalogEngine />;
   }
 
-  if (activeTab === "transactions") {
-    return <TransactionPipelineBoard />;
-  }
-
-  if (activeTab === "billing") {
-    return <BillingConsole />;
-  }
-
   const content = {
     macro: {
       icon: Landmark,
-      title: "Macro Engine",
-      body: "Strict IBM/Qiskit macro pipeline, Alpaca paper-order adapter, and PostgreSQL telemetry store.",
+      title: "Quantum Lab",
+      body: "IBM/Qiskit experiments and local paper research tools. This is separate from the help-resource ledgers.",
       command: "py -3.11 strict_macro_quantum_v10.py --preflight",
     },
   }[activeTab];
@@ -1389,7 +975,7 @@ function ToolPanel({ activeTab }) {
 function Dashboard({ user, onLogout }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("macro");
+  const [activeTab, setActiveTab] = useState("grants");
   const [optimizerMode, setOptimizerMode] = useState("classical");
   const [optimizerData, setOptimizerData] = useState(null);
   const [optimizerError, setOptimizerError] = useState("");
@@ -1528,7 +1114,6 @@ function Dashboard({ user, onLogout }) {
         ticker: asset.ticker,
         weight: Number(asset.target_weight),
         percent: Number(asset.target_weight) * 100,
-        commandCash: Number(asset.target_weight) * COMMAND_CAPITAL,
         cash: Number(asset.paper_cash),
         risk: Number(asset.volatility) * 100,
         return: Number(asset.expected_return) * 100,
@@ -1576,31 +1161,25 @@ function Dashboard({ user, onLogout }) {
         <div className="rail-brand">
           <CircuitBoard size={23} />
         </div>
-        <button className={activeTab === "macro" ? "rail-active" : ""} onClick={() => setActiveTab("macro")} title="Macro Engine">
-          <Landmark size={20} />
-        </button>
-        <button className={activeTab === "grants" ? "rail-active" : ""} onClick={() => setActiveTab("grants")} title="Grants Optimizer">
+        <button className={activeTab === "grants" ? "rail-active" : ""} onClick={() => setActiveTab("grants")} title="Grants and Help">
           <GraduationCap size={20} />
         </button>
-        <button className={activeTab === "housing" ? "rail-active" : ""} onClick={() => setActiveTab("housing")} title="Housing Log">
+        <button className={activeTab === "housing" ? "rail-active" : ""} onClick={() => setActiveTab("housing")} title="Housing Help">
           <Home size={20} />
         </button>
         <button className={activeTab === "catalog" ? "rail-active" : ""} onClick={() => setActiveTab("catalog")} title="Item Catalog">
           <Gem size={20} />
         </button>
-        <button className={activeTab === "transactions" ? "rail-active" : ""} onClick={() => setActiveTab("transactions")} title="Transaction Pipeline">
-          <Building2 size={20} />
-        </button>
-        <button className={activeTab === "billing" ? "rail-active" : ""} onClick={() => setActiveTab("billing")} title="Billing">
-          <CreditCard size={20} />
+        <button className={activeTab === "macro" ? "rail-active" : ""} onClick={() => setActiveTab("macro")} title="Quantum Lab">
+          <Landmark size={20} />
         </button>
       </aside>
 
       <section className="command-main">
         <header className="command-topbar">
           <div>
-            <p className="eyebrow">Data-Analytics / Repo 52</p>
-            <h1>Macro Asset Command Center</h1>
+            <p className="eyebrow">Repo 52</p>
+            <h1>Quantum Command 52</h1>
           </div>
           <div className="operator-block">
             <span>{user.displayName}</span>
@@ -1611,14 +1190,11 @@ function Dashboard({ user, onLogout }) {
         </header>
 
         {error && <div className="error-line">{error}</div>}
-        {!data && !error && <div className="loading-panel">Loading command telemetry...</div>}
+        {!data && !error && <div className="loading-panel">Loading resource lists...</div>}
 
         {data && (
           <>
             <section className="module-tabs">
-              <button className={activeTab === "macro" ? "active" : ""} onClick={() => setActiveTab("macro")} type="button">
-                <Landmark size={17} /> Macro
-              </button>
               <button className={activeTab === "grants" ? "active" : ""} onClick={() => setActiveTab("grants")} type="button">
                 <GraduationCap size={17} /> Grants
               </button>
@@ -1628,28 +1204,31 @@ function Dashboard({ user, onLogout }) {
               <button className={activeTab === "catalog" ? "active" : ""} onClick={() => setActiveTab("catalog")} type="button">
                 <FileSearch size={17} /> Catalog
               </button>
-              <button className={activeTab === "transactions" ? "active" : ""} onClick={() => setActiveTab("transactions")} type="button">
-                <Building2 size={17} /> Deals
-              </button>
-              <button className={activeTab === "billing" ? "active" : ""} onClick={() => setActiveTab("billing")} type="button">
-                <CreditCard size={17} /> Billing
+              <button className={activeTab === "macro" ? "active" : ""} onClick={() => setActiveTab("macro")} type="button">
+                <Landmark size={17} /> Quantum
               </button>
             </section>
 
             {activeTab === "macro" ? (
               <>
                 <section className="hud-grid">
-                  <HudCard icon={Landmark} label="Command capital" value="$500,000" detail="institutional sandbox boundary" tone="blue" />
+                  <HudCard
+                    icon={Landmark}
+                    label="Paper balance"
+                    value={`$${Number(summary.totalCash || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                    detail="local research amount"
+                    tone="blue"
+                  />
                   <HudCard icon={BarChart3} label="Weighted return" value={`${((summary.weightedReturn || 0) * 100).toFixed(2)}%`} detail="model input estimate" tone="green" />
                   <HudCard icon={Gauge} label="Weighted risk" value={`${((summary.weightedRisk || 0) * 100).toFixed(2)}%`} detail="mathematical exposure" tone="orange" />
-                  <HudCard icon={Database} label="Telemetry assets" value={summary.assetCount || 0} detail="PostgreSQL portfolio layer" tone="violet" />
+                  <HudCard icon={Database} label="Saved assets" value={summary.assetCount || 0} detail="local portfolio rows" tone="violet" />
                 </section>
 
                 <section className="ticker-strip">
                   {chartData.map((asset) => (
                     <div className="ticker-cell" key={asset.ticker}>
                       <strong>{asset.ticker}</strong>
-                      <span>${asset.commandCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <span>${asset.cash.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                       <small>{asset.percent.toFixed(2)}% target</small>
                     </div>
                   ))}
@@ -1681,13 +1260,13 @@ function Dashboard({ user, onLogout }) {
                     <div className="panel-heading">
                       <div>
                         <p className="eyebrow">Allocation wheel</p>
-                        <h2>Capital Distribution</h2>
+                        <h2>Paper Distribution</h2>
                       </div>
                       <PieChart size={18} />
                     </div>
                     <ResponsiveContainer width="100%" height={280}>
                       <RePieChart>
-                        <Pie data={chartData} dataKey="commandCash" nameKey="ticker" innerRadius={58} outerRadius={100} paddingAngle={4}>
+                        <Pie data={chartData} dataKey="cash" nameKey="ticker" innerRadius={58} outerRadius={100} paddingAngle={4}>
                           {chartData.map((entry) => (
                             <Cell key={entry.ticker} fill={entry.fill} />
                           ))}
