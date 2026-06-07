@@ -56,6 +56,7 @@ from alpaca.trading.enums import OrderSide, TimeInForce  # noqa: E402
 from alpaca.trading.requests import MarketOrderRequest  # noqa: E402
 from qiskit import QuantumCircuit  # noqa: E402
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2  # noqa: E402
+from qaoa_portfolio_optimizer import build_qubo, optimize_portfolio_qaoa, portfolio_energy  # noqa: E402
 from rich.console import Console  # noqa: E402
 from rich.panel import Panel  # noqa: E402
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn  # noqa: E402
@@ -369,6 +370,30 @@ def fetch_market_metrics(assets: list[str], period: str) -> tuple[list[float], l
     return returns, volatilities, prices
 
 
+def fetch_market_covariance(assets: list[str], period: str) -> tuple[np.ndarray, np.ndarray, list[float]]:
+    close_prices: dict[str, pd.Series] = {}
+    prices: list[float] = []
+    for ticker in assets:
+        console.print(f"[cyan]Fetching {ticker} from yfinance...[/cyan]")
+        history = yf.Ticker(ticker).history(period=period)
+        if history.empty or "Close" not in history:
+            fail(f"yfinance returned empty close-price history for {ticker}.")
+        close_prices[ticker] = history["Close"]
+        latest_price = float(history["Close"].iloc[-1])
+        if latest_price <= 0:
+            fail(f"Invalid latest market price for {ticker}: {latest_price}")
+        prices.append(latest_price)
+
+    returns_frame = pd.DataFrame(close_prices).pct_change().dropna()
+    if returns_frame.empty:
+        fail("Not enough shared return history to build a covariance matrix.")
+
+    annual_returns = returns_frame.mean().to_numpy(dtype=float) * 252
+    covariance = returns_frame.cov().to_numpy(dtype=float) * 252
+    covariance += np.eye(len(assets)) * 1e-6
+    return annual_returns, covariance, prices
+
+
 def normalize_weight_vector(raw_scores: np.ndarray) -> np.ndarray:
     clipped = np.maximum(raw_scores.astype(float), 0.001)
     return clipped / np.sum(clipped)
@@ -379,18 +404,6 @@ def classical_optimizer_weights(returns: list[float], volatilities: list[float])
     weights = normalize_weight_vector(score_vector)
     convergence = [
         {"cycle": cycle, "score": round(float(np.mean(score_vector)) * (cycle / 8), 6), "loss": round(1 / (cycle + 1), 6)}
-        for cycle in range(1, 9)
-    ]
-    return weights, convergence
-
-
-def qaoa_research_weights(returns: list[float], volatilities: list[float]) -> tuple[np.ndarray, list[dict[str, float]]]:
-    index_vector = np.arange(1, len(returns) + 1, dtype=float)
-    phase_vector = 1.15 + np.sin(index_vector * 1.618) * 0.22
-    qubo_scores = np.maximum(np.array(returns) - np.array(volatilities) * 0.18, 0.01)
-    weights = normalize_weight_vector(qubo_scores * phase_vector)
-    convergence = [
-        {"cycle": cycle, "score": round(float(np.log1p(cycle) * 0.118), 6), "loss": round(float(0.72 / (cycle + 1)), 6)}
         for cycle in range(1, 9)
     ]
     return weights, convergence
@@ -495,6 +508,10 @@ def main() -> None:
     parser.add_argument("--period", default="60d")
     parser.add_argument("--backend", default=None)
     parser.add_argument("--optimizer-mode", choices=["qml", "classical", "qaoa"], default="qml")
+    parser.add_argument("--qaoa-budget", type=int, default=0)
+    parser.add_argument("--qaoa-reps", type=int, default=2)
+    parser.add_argument("--qaoa-maxiter", type=int, default=200)
+    parser.add_argument("--qaoa-shots", type=int, default=4096)
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--preview-alpaca-orders", action="store_true")
     parser.add_argument("--submit-paper-orders", action="store_true")
@@ -510,12 +527,9 @@ def main() -> None:
         return
 
     assets = [asset.strip() for asset in args.assets.split(",") if asset.strip()]
-    if args.optimizer_mode in {"classical", "qaoa"}:
+    if args.optimizer_mode == "classical":
         returns, volatilities, prices = fetch_market_metrics(assets, args.period)
-        if args.optimizer_mode == "classical":
-            weights, convergence = classical_optimizer_weights(returns, volatilities)
-        else:
-            weights, convergence = qaoa_research_weights(returns, volatilities)
+        weights, convergence = classical_optimizer_weights(returns, volatilities)
         write_hybrid_optimizer_ledger(
             mode=args.optimizer_mode,
             assets=assets,
@@ -526,6 +540,47 @@ def main() -> None:
             prices=prices,
             convergence=convergence,
         )
+        return
+
+    if args.optimizer_mode == "qaoa":
+        mu, covariance, prices = fetch_market_covariance(assets, args.period)
+        budget = args.qaoa_budget or max(1, min(len(assets), round(len(assets) * 0.6)))
+        result = optimize_portfolio_qaoa(
+            assets,
+            mu,
+            covariance,
+            budget=budget,
+            reps=args.qaoa_reps,
+            maxiter=args.qaoa_maxiter,
+            shots=args.qaoa_shots,
+        )
+        selected_count = max(result.qaoa_bits.count("1"), 1)
+        weights = np.array([1 / selected_count if bit == "1" else 0.0 for bit in result.qaoa_bits], dtype=float)
+        volatilities = np.sqrt(np.diag(covariance)).tolist()
+        q_matrix = build_qubo(mu, covariance, budget, risk_factor=0.5, penalty=2.0)
+        top_counts = sorted(result.counts.items(), key=lambda item: item[1], reverse=True)[:8]
+        convergence = [
+            {
+                "cycle": index,
+                "score": round(count / args.qaoa_shots, 6),
+                "loss": round(abs(portfolio_energy(bits, q_matrix) - result.exact_cost), 6),
+            }
+            for index, (bits, count) in enumerate(top_counts, start=1)
+        ]
+        write_hybrid_optimizer_ledger(
+            mode=args.optimizer_mode,
+            assets=assets,
+            bankroll=args.bankroll,
+            weights=weights,
+            returns=mu.tolist(),
+            volatilities=volatilities,
+            prices=prices,
+            convergence=convergence,
+        )
+        console.print(f"[cyan]QAOA bits:[/cyan] {result.qaoa_bits} -> {result.selected_tickers}")
+        console.print(f"[cyan]Exact bits:[/cyan] {result.exact_bits}")
+        console.print(f"[cyan]Matched exact optimum:[/cyan] {result.matched_exact}")
+        console.print(f"[cyan]QAOA cost:[/cyan] {result.qaoa_cost:+.6f}  [cyan]Exact cost:[/cyan] {result.exact_cost:+.6f}")
         return
 
     engine = MacroQuantumEmpireV10(

@@ -31,7 +31,9 @@ Added the Sprint 1 and Sprint 2 foundation:
 - Macro dashboard now includes a Hybrid Optimizer panel with Classical and Quantum QAOA comparator toggles.
 - Added optimizer convergence charts, paper allocation rows, summary metrics, and a clear non-advice boundary.
 - `strict_macro_quantum_v10.py` now supports `--optimizer-mode classical`, `--optimizer-mode qaoa`, and existing `--optimizer-mode qml`.
-- Classical mode writes a practical risk-adjusted paper ledger; QAOA mode writes a research-style convergence workbook.
+- Added `qaoa_portfolio_optimizer.py` as a real QUBO-to-Ising QAOA portfolio-selection artifact.
+- QAOA mode builds a portfolio QUBO, maps it to a `SparsePauliOp` Ising Hamiltonian, runs `QAOAAnsatz` with statevector primitives, samples the optimized circuit, and compares against brute force.
+- Classical mode writes a practical risk-adjusted paper ledger; QAOA mode writes a statevector QAOA workbook and prints the exact-optimum match check.
 
 Verification:
 
@@ -40,6 +42,7 @@ Verification:
 - SQLite demo smoke test created `web-dashboard\data.db` and seeded grants, housing, inventory, and transactions.
 - SQLite reload smoke test loaded persisted rows from `data.db` without reseeding.
 - `/api/optimizer` payload smoke test returned the quantum mode payload successfully.
+- `py -3.11 qaoa_portfolio_optimizer.py` matched the brute-force optimum on the local QAOA demo.
 - `.gitignore` already excludes `web-dashboard/*.db` and `web-dashboard/*.db-*`.
 
 ### Current release - Add local demo mode for desktop launcher

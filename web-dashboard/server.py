@@ -856,6 +856,7 @@ def optimizer_payload(mode: str) -> dict:
         label = "Classical risk-adjusted solver"
         backend = "local scipy-style paper solver"
         description = "Deterministic Sharpe-style scoring for practical paper allocation analysis."
+        artifact_command = "py -3.11 strict_macro_quantum_v10.py --optimizer-mode classical"
         convergence = [
             {"cycle": cycle, "score": round(0.42 + cycle * 0.047, 4), "loss": round(0.58 - cycle * 0.041, 4)}
             for cycle in range(1, 9)
@@ -866,9 +867,10 @@ def optimizer_payload(mode: str) -> dict:
             phase = 1.15 + math.sin((index + 1) * 1.618) * 0.22
             qubo_value = max(asset["expected_return"] - asset["volatility"] * 0.18, 0.01)
             raw_scores.append(qubo_value * phase)
-        label = "Quantum QAOA research comparator"
-        backend = "local QAOA-style simulator"
-        description = "Maps the allocation target into a small QUBO-style search artifact for presentations."
+        label = "Quantum QAOA dashboard preview"
+        backend = "fast local QAOA preview"
+        description = "Fast UI preview. Run the strict macro QAOA mode for full QUBO-to-Ising statevector optimization."
+        artifact_command = "py -3.11 strict_macro_quantum_v10.py --optimizer-mode qaoa"
         convergence = [
             {
                 "cycle": cycle,
@@ -901,6 +903,7 @@ def optimizer_payload(mode: str) -> dict:
         "label": label,
         "backend": backend,
         "description": description,
+        "artifactCommand": artifact_command,
         "summary": {
             "paperCapital": 500000,
             "expectedReturn": round(expected_return, 4),

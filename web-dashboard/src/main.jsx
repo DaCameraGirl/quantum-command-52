@@ -1609,6 +1609,7 @@ function Dashboard({ user, onLogout }) {
                           <span>{optimizerData.backend}</span>
                           <h3>{optimizerData.label}</h3>
                           <p>{optimizerData.description}</p>
+                          <code className="optimizer-command">{optimizerData.artifactCommand}</code>
                           <div className="optimizer-metrics">
                             <div>
                               <small>Paper return</small>

@@ -568,6 +568,18 @@ select:focus {
   line-height: 1.5;
 }
 
+.optimizer-command {
+  display: block;
+  margin-bottom: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 7px;
+  padding: 8px 9px;
+  overflow-wrap: anywhere;
+  background: #050a12;
+  color: #7dd3fc;
+  font-size: 0.78rem;
+}
+
 .optimizer-summary span,
 .optimizer-summary small,
 .optimizer-allocation small {
