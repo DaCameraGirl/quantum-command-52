@@ -4,6 +4,28 @@ $RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $DashboardRoot = Join-Path $RepoRoot "web-dashboard"
 $DashboardUrl = "http://127.0.0.1:5173"
 
+function Stop-Repo52PortListeners {
+    param(
+        [int[]] $Ports
+    )
+
+    foreach ($Port in $Ports) {
+        $Connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+        foreach ($Connection in $Connections) {
+            $ProcessId = $Connection.OwningProcess
+            if ($ProcessId -gt 0) {
+                try {
+                    $Process = Get-Process -Id $ProcessId -ErrorAction Stop
+                    Write-Host "Stopping stale Repo 52 listener on port $Port (PID $ProcessId / $($Process.ProcessName))..." -ForegroundColor Yellow
+                    Stop-Process -Id $ProcessId -Force -ErrorAction Stop
+                } catch {
+                    Write-Host "Could not stop listener on port $Port (PID $ProcessId): $($_.Exception.Message)" -ForegroundColor DarkYellow
+                }
+            }
+        }
+    }
+}
+
 function Start-Repo52Window {
     param(
         [Parameter(Mandatory = $true)]
@@ -51,6 +73,7 @@ npm run dev
 
 Write-Host "Launching Repo 52 Command Center..." -ForegroundColor Cyan
 Write-Host "Repo: $RepoRoot"
+Stop-Repo52PortListeners -Ports @(8787, 5173)
 
 Start-Repo52Window -Title "Repo 52 Backend API" -Command $BackendCommand
 Start-Sleep -Seconds 2

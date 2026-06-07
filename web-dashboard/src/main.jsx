@@ -1483,128 +1483,6 @@ function Dashboard({ user, onLogout }) {
 
         {data && (
           <>
-            <section className="hud-grid">
-              <HudCard icon={Landmark} label="Command capital" value="$500,000" detail="institutional sandbox boundary" tone="blue" />
-              <HudCard icon={BarChart3} label="Weighted return" value={`${((summary.weightedReturn || 0) * 100).toFixed(2)}%`} detail="model input estimate" tone="green" />
-              <HudCard icon={Gauge} label="Weighted risk" value={`${((summary.weightedRisk || 0) * 100).toFixed(2)}%`} detail="mathematical exposure" tone="orange" />
-              <HudCard icon={Database} label="Telemetry assets" value={summary.assetCount || 0} detail="PostgreSQL portfolio layer" tone="violet" />
-            </section>
-
-            <section className="ticker-strip">
-              {chartData.map((asset) => (
-                <div className="ticker-cell" key={asset.ticker}>
-                  <strong>{asset.ticker}</strong>
-                  <span>${asset.commandCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                  <small>{asset.percent.toFixed(2)}% target</small>
-                </div>
-              ))}
-            </section>
-
-            <section className="control-grid">
-              <div className="control-panel span-2">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Risk analysis curve</p>
-                    <h2>Return / Volatility / Exposure</h2>
-                  </div>
-                  <Zap size={18} />
-                </div>
-                <ResponsiveContainer width="100%" height={310}>
-                  <LineChart data={riskCurve}>
-                    <CartesianGrid stroke="#263244" strokeDasharray="3 5" vertical={false} />
-                    <XAxis dataKey="name" stroke="#7c8aa5" />
-                    <YAxis stroke="#7c8aa5" />
-                    <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
-                    <Line type="monotone" dataKey="return" stroke="#22c55e" strokeWidth={3} dot={false} />
-                    <Line type="monotone" dataKey="risk" stroke="#f97316" strokeWidth={3} dot={false} />
-                    <Line type="monotone" dataKey="exposure" stroke="#38bdf8" strokeWidth={3} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="control-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Allocation wheel</p>
-                    <h2>Capital Distribution</h2>
-                  </div>
-                  <PieChart size={18} />
-                </div>
-                <ResponsiveContainer width="100%" height={280}>
-                  <RePieChart>
-                    <Pie data={chartData} dataKey="commandCash" nameKey="ticker" innerRadius={58} outerRadius={100} paddingAngle={4}>
-                      {chartData.map((entry) => (
-                        <Cell key={entry.ticker} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} formatter={(value) => `$${Number(value).toFixed(2)}`} />
-                  </RePieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="control-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Deployment risk vectors</p>
-                    <h2>System Change Posture</h2>
-                  </div>
-                  <AlertTriangle size={18} />
-                </div>
-                <div className="vector-stack">
-                  {riskVectors.map((vector) => (
-                    <div className="vector-row" key={vector.label}>
-                      <span>{vector.label}</span>
-                      <strong>{vector.value}</strong>
-                      <StatusPill status={vector.status} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="control-panel span-2">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Policy compliance gate ledger</p>
-                    <h2>Production Readiness Gates</h2>
-                  </div>
-                  <ShieldCheck size={18} />
-                </div>
-                <div className="gate-table">
-                  {gates.map((gate) => (
-                    <div className="gate-row" key={gate.gate}>
-                      <CheckCircle2 size={17} />
-                      <span>{gate.gate}</span>
-                      <small>{gate.owner}</small>
-                      <StatusPill status={gate.status} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="control-panel">
-                <div className="panel-heading">
-                  <div>
-                    <p className="eyebrow">Capital grid</p>
-                    <h2>Asset Ledger</h2>
-                  </div>
-                  <Boxes size={18} />
-                </div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid stroke="#263244" strokeDasharray="3 5" vertical={false} />
-                    <XAxis dataKey="ticker" stroke="#7c8aa5" />
-                    <YAxis stroke="#7c8aa5" />
-                    <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
-                    <Bar dataKey="percent" radius={[4, 4, 0, 0]}>
-                      {chartData.map((entry) => (
-                        <Cell key={entry.ticker} fill={entry.fill} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </section>
-
             <section className="module-tabs">
               <button className={activeTab === "macro" ? "active" : ""} onClick={() => setActiveTab("macro")} type="button">
                 <Landmark size={17} /> Macro
@@ -1625,7 +1503,135 @@ function Dashboard({ user, onLogout }) {
                 <CreditCard size={17} /> Billing
               </button>
             </section>
-            <ToolPanel activeTab={activeTab} />
+
+            {activeTab === "macro" ? (
+              <>
+                <section className="hud-grid">
+                  <HudCard icon={Landmark} label="Command capital" value="$500,000" detail="institutional sandbox boundary" tone="blue" />
+                  <HudCard icon={BarChart3} label="Weighted return" value={`${((summary.weightedReturn || 0) * 100).toFixed(2)}%`} detail="model input estimate" tone="green" />
+                  <HudCard icon={Gauge} label="Weighted risk" value={`${((summary.weightedRisk || 0) * 100).toFixed(2)}%`} detail="mathematical exposure" tone="orange" />
+                  <HudCard icon={Database} label="Telemetry assets" value={summary.assetCount || 0} detail="PostgreSQL portfolio layer" tone="violet" />
+                </section>
+
+                <section className="ticker-strip">
+                  {chartData.map((asset) => (
+                    <div className="ticker-cell" key={asset.ticker}>
+                      <strong>{asset.ticker}</strong>
+                      <span>${asset.commandCash.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <small>{asset.percent.toFixed(2)}% target</small>
+                    </div>
+                  ))}
+                </section>
+
+                <section className="control-grid">
+                  <div className="control-panel span-2">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Risk analysis curve</p>
+                        <h2>Return / Volatility / Exposure</h2>
+                      </div>
+                      <Zap size={18} />
+                    </div>
+                    <ResponsiveContainer width="100%" height={310}>
+                      <LineChart data={riskCurve}>
+                        <CartesianGrid stroke="#263244" strokeDasharray="3 5" vertical={false} />
+                        <XAxis dataKey="name" stroke="#7c8aa5" />
+                        <YAxis stroke="#7c8aa5" />
+                        <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
+                        <Line type="monotone" dataKey="return" stroke="#22c55e" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="risk" stroke="#f97316" strokeWidth={3} dot={false} />
+                        <Line type="monotone" dataKey="exposure" stroke="#38bdf8" strokeWidth={3} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="control-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Allocation wheel</p>
+                        <h2>Capital Distribution</h2>
+                      </div>
+                      <PieChart size={18} />
+                    </div>
+                    <ResponsiveContainer width="100%" height={280}>
+                      <RePieChart>
+                        <Pie data={chartData} dataKey="commandCash" nameKey="ticker" innerRadius={58} outerRadius={100} paddingAngle={4}>
+                          {chartData.map((entry) => (
+                            <Cell key={entry.ticker} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} formatter={(value) => `$${Number(value).toFixed(2)}`} />
+                      </RePieChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="control-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Deployment risk vectors</p>
+                        <h2>System Change Posture</h2>
+                      </div>
+                      <AlertTriangle size={18} />
+                    </div>
+                    <div className="vector-stack">
+                      {riskVectors.map((vector) => (
+                        <div className="vector-row" key={vector.label}>
+                          <span>{vector.label}</span>
+                          <strong>{vector.value}</strong>
+                          <StatusPill status={vector.status} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="control-panel span-2">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Policy compliance gate ledger</p>
+                        <h2>Production Readiness Gates</h2>
+                      </div>
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div className="gate-table">
+                      {gates.map((gate) => (
+                        <div className="gate-row" key={gate.gate}>
+                          <CheckCircle2 size={17} />
+                          <span>{gate.gate}</span>
+                          <small>{gate.owner}</small>
+                          <StatusPill status={gate.status} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="control-panel">
+                    <div className="panel-heading">
+                      <div>
+                        <p className="eyebrow">Capital grid</p>
+                        <h2>Asset Ledger</h2>
+                      </div>
+                      <Boxes size={18} />
+                    </div>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid stroke="#263244" strokeDasharray="3 5" vertical={false} />
+                        <XAxis dataKey="ticker" stroke="#7c8aa5" />
+                        <YAxis stroke="#7c8aa5" />
+                        <Tooltip contentStyle={{ background: "#0b1220", border: "1px solid #233049", color: "#e5edf7" }} />
+                        <Bar dataKey="percent" radius={[4, 4, 0, 0]}>
+                          {chartData.map((entry) => (
+                            <Cell key={entry.ticker} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+                <ToolPanel activeTab={activeTab} />
+              </>
+            ) : (
+              <ToolPanel activeTab={activeTab} />
+            )}
           </>
         )}
       </section>
