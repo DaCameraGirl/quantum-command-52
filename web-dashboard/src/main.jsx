@@ -45,8 +45,43 @@ import {
 import "./styles.css";
 
 const COLORS = ["#38bdf8", "#22c55e", "#f97316", "#a78bfa", "#f43f5e", "#facc15"];
+const STATIC_DEMO = import.meta.env.PROD && /\.github\.io$/i.test(window.location.hostname);
+
+const STATIC_GET_ROUTES = {
+  "/api/me": "demo/me.json",
+  "/api/grants": "demo/grants.json",
+  "/api/housing": "demo/housing.json",
+  "/api/inventory": "demo/inventory.json",
+  "/api/portfolio": "demo/portfolio.json",
+  "/api/transactions": "demo/transactions.json",
+  "/api/optimizer/runs": "demo/optimizer-runs.json",
+  "/api/optimizer/jobs": "demo/optimizer-jobs.json",
+};
+
+async function fetchStaticDemo(path) {
+  const basePath = path.split("?")[0];
+  if (basePath === "/api/optimizer") {
+    const mode = new URLSearchParams(path.split("?")[1] || "").get("mode") || "classical";
+    const file = mode === "quantum" ? "demo/optimizer-quantum.json" : "demo/optimizer-classical.json";
+    const response = await fetch(`${import.meta.env.BASE}${file}`);
+    if (!response.ok) throw new Error("Static demo data is unavailable.");
+    return response.json();
+  }
+  const file = STATIC_GET_ROUTES[basePath];
+  if (!file) throw new Error("This action needs the full local app (desktop icon 52).");
+  const response = await fetch(`${import.meta.env.BASE}${file}`);
+  if (!response.ok) throw new Error("Static demo data is unavailable.");
+  return response.json();
+}
 
 async function api(path, options = {}) {
+  if (STATIC_DEMO) {
+    const method = (options.method || "GET").toUpperCase();
+    if (method !== "GET") {
+      throw new Error("Read-only on GitHub Pages. Use desktop icon 52 for edits and quantum jobs.");
+    }
+    return fetchStaticDemo(path);
+  }
   const response = await fetch(path, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
