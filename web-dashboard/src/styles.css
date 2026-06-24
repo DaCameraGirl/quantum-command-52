@@ -50,6 +50,11 @@ button:disabled {
   padding: 52px 0;
 }
 
+.pages-auth-copy {
+  margin: 0 0 18px;
+  line-height: 1.55;
+}
+
 .brand-mark,
 .rail-brand,
 .hud-icon,

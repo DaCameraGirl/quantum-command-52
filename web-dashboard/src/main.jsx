@@ -47,6 +47,11 @@ import "./styles.css";
 const COLORS = ["#38bdf8", "#22c55e", "#f97316", "#a78bfa", "#f43f5e", "#facc15"];
 const STATIC_DEMO = import.meta.env.PROD && /\.github\.io$/i.test(window.location.hostname);
 
+const PAGES_PREVIEW_USER = {
+  email: "angela@data-analytics.local",
+  displayName: "Angela Demo",
+};
+
 const STATIC_GET_ROUTES = {
   "/api/me": "demo/me.json",
   "/api/meta": "demo/meta.json",
@@ -122,6 +127,15 @@ function DataSourceBanner({ meta }) {
   );
 }
 
+async function loadPagesPreviewUser() {
+  try {
+    const payload = await fetchStaticDemo("/api/me");
+    return payload?.user || PAGES_PREVIEW_USER;
+  } catch {
+    return PAGES_PREVIEW_USER;
+  }
+}
+
 async function fetchStaticDemo(path) {
   const basePath = path.split("?")[0];
   if (basePath === "/api/optimizer") {
@@ -141,16 +155,28 @@ async function fetchStaticDemo(path) {
 async function api(path, options = {}) {
   if (STATIC_DEMO) {
     const method = (options.method || "GET").toUpperCase();
+    const basePath = path.split("?")[0];
     if (method !== "GET") {
+      if (basePath === "/api/login" || basePath === "/api/register") {
+        return { user: await loadPagesPreviewUser() };
+      }
+      if (basePath === "/api/logout") {
+        return { ok: true };
+      }
       throw new Error("Read-only on GitHub Pages. Use desktop icon 52 for edits and quantum jobs.");
     }
     return fetchStaticDemo(path);
   }
-  const response = await fetch(path, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      ...options,
+    });
+  } catch {
+    throw new Error("Cannot reach the Repo 52 API. Launch desktop icon 52 and keep the backend window open.");
+  }
   const payload = await response.json();
   if (!response.ok) throw new Error(payload.error || "Request failed");
   return payload;
@@ -184,9 +210,14 @@ function AuthPanel({ onAuth }) {
     }
   }
 
-  async function openDemo() {
+  async function openPreview() {
     setError("");
     try {
+      const previewUser = STATIC_DEMO ? await loadPagesPreviewUser() : null;
+      if (previewUser) {
+        onAuth(previewUser);
+        return;
+      }
       const payload = await api("/api/login", {
         method: "POST",
         body: JSON.stringify({ email: "demo@repo52.local", password: "demo-password" }),
@@ -222,42 +253,57 @@ function AuthPanel({ onAuth }) {
       </section>
 
       <section className="auth-panel" aria-label="Authentication form">
-        <div className="segmented">
-          <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")} type="button">
-            <Lock size={16} /> Sign in
-          </button>
-          <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")} type="button">
-            <UserPlus size={16} /> Register
-          </button>
-        </div>
-        <form onSubmit={submit}>
-          {mode === "register" && (
-            <label>
-              Display name
-              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
-            </label>
-          )}
-          <label>
-            Email
-            <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" />
-          </label>
-          <label>
-            Password
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              autoComplete={mode === "login" ? "current-password" : "new-password"}
-            />
-          </label>
-          {error && <div className="error-line">{error}</div>}
-          <button className="primary-action" type="submit">
-            {mode === "login" ? "Sign in" : "Create account"} <ArrowRight size={18} />
-          </button>
-          <button className="ghost-button demo-login-button" onClick={openDemo} type="button">
-            Sign in with demo account
-          </button>
-        </form>
+        {STATIC_DEMO ? (
+          <>
+            <p className="auth-copy pages-auth-copy">
+              GitHub Pages is a read-only CSV snapshot. Accounts, edits, and quantum jobs need the local app from desktop
+              icon <strong>52</strong>.
+            </p>
+            {error && <div className="error-line">{error}</div>}
+            <button className="primary-action" onClick={openPreview} type="button">
+              Open read-only snapshot <ArrowRight size={18} />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="segmented">
+              <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")} type="button">
+                <Lock size={16} /> Sign in
+              </button>
+              <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")} type="button">
+                <UserPlus size={16} /> Register
+              </button>
+            </div>
+            <form onSubmit={submit}>
+              {mode === "register" && (
+                <label>
+                  Display name
+                  <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+                </label>
+              )}
+              <label>
+                Email
+                <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" />
+              </label>
+              <label>
+                Password
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type="password"
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                />
+              </label>
+              {error && <div className="error-line">{error}</div>}
+              <button className="primary-action" type="submit">
+                {mode === "login" ? "Sign in" : "Create account"} <ArrowRight size={18} />
+              </button>
+              <button className="ghost-button demo-login-button" onClick={openPreview} type="button">
+                Sign in with demo account
+              </button>
+            </form>
+          </>
+        )}
       </section>
     </main>
   );
@@ -1752,13 +1798,28 @@ function App() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    if (STATIC_DEMO) {
+      loadPagesPreviewUser()
+        .then((previewUser) => setUser(previewUser))
+        .finally(() => setChecking(false));
+      return;
+    }
     api("/api/me")
-      .then((payload) => setUser(payload.user))
+      .then((payload) => setUser(payload.user || null))
+      .catch(() => setUser(null))
       .finally(() => setChecking(false));
   }, []);
 
   async function logout() {
-    await api("/api/logout", { method: "POST", body: "{}" });
+    if (STATIC_DEMO) {
+      setUser(null);
+      return;
+    }
+    try {
+      await api("/api/logout", { method: "POST", body: "{}" });
+    } catch {
+      // Still clear local session if the API is offline.
+    }
     setUser(null);
   }
 
