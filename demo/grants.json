@@ -2,22 +2,10 @@
   "summary": {
     "grantCount": 9,
     "activeGrantCount": 9,
-    "totalFunding": 14000.0,
-    "topPriorityScore": 10.0
+    "totalFunding": 16000.0,
+    "topPriorityScore": 32.0
   },
   "grants": [
-    {
-      "id": 9,
-      "grant_name": "Soroptimist Live Your Dream Awards",
-      "source_url": "https://www.liveyourdream.org/our-dream/opportunity-through-education/education-grants.html",
-      "funding_amount": 3000.0,
-      "deadline": "2026-11-15",
-      "application_difficulty": 2,
-      "status": "ready",
-      "priority_score": 10.0,
-      "created_at": "2026-06-24 16:35:42.749555+00:00",
-      "updated_at": "2026-06-24 16:35:42.749556+00:00"
-    },
     {
       "id": 5,
       "grant_name": "HUD Find Shelter",
@@ -26,9 +14,12 @@
       "deadline": null,
       "application_difficulty": 1,
       "status": "ready",
-      "priority_score": 3.0,
-      "created_at": "2026-06-24 16:35:42.749523+00:00",
-      "updated_at": "2026-06-24 16:35:42.749524+00:00"
+      "priority_score": 32.0,
+      "eligibility": "People facing homelessness who need shelter or local services",
+      "notes": "Official HUD tool for shelter plus food pantry health clinic and clothing resources.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742372+00:00",
+      "updated_at": "2026-06-24 20:33:22.742373+00:00"
     },
     {
       "id": 6,
@@ -38,9 +29,27 @@
       "deadline": null,
       "application_difficulty": 1,
       "status": "ready",
-      "priority_score": 3.0,
-      "created_at": "2026-06-24 16:35:42.749527+00:00",
-      "updated_at": "2026-06-24 16:35:42.749528+00:00"
+      "priority_score": 32.0,
+      "eligibility": "People facing or experiencing homelessness",
+      "notes": "Official USAGov page for emergency housing plus HUD local assistance Continuum of Care providers and 211.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742382+00:00",
+      "updated_at": "2026-06-24 20:33:22.742382+00:00"
+    },
+    {
+      "id": 9,
+      "grant_name": "Soroptimist Live Your Dream Awards",
+      "source_url": "https://www.liveyourdream.org/our-dream/opportunity-through-education/education-grants.html",
+      "funding_amount": 5000.0,
+      "deadline": "2026-11-15",
+      "application_difficulty": 2,
+      "status": "research",
+      "priority_score": 30.0,
+      "eligibility": "Women who are primary financial support for their families and pursuing education or training",
+      "notes": "Award amounts and local club deadlines vary; use the official page to find the current application.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.788660+00:00",
+      "updated_at": "2026-06-24 20:33:22.788662+00:00"
     },
     {
       "id": 1,
@@ -50,9 +59,12 @@
       "deadline": null,
       "application_difficulty": 2,
       "status": "research",
-      "priority_score": -2.0,
-      "created_at": "2026-06-24 16:35:42.749497+00:00",
-      "updated_at": "2026-06-24 16:35:42.749505+00:00"
+      "priority_score": 25.0,
+      "eligibility": "Low-income women with children pursuing education or training",
+      "notes": "Official page states the 2026 foundation awards are up to $5000; verify current deadline before applying.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742314+00:00",
+      "updated_at": "2026-06-24 20:33:22.742322+00:00"
     },
     {
       "id": 3,
@@ -60,11 +72,44 @@
       "source_url": "https://www.act-today.org/apply-for-grant/",
       "funding_amount": 5000.0,
       "deadline": null,
-      "application_difficulty": 3,
+      "application_difficulty": 2,
       "status": "research",
-      "priority_score": -5.0,
-      "created_at": "2026-06-24 16:35:42.749516+00:00",
-      "updated_at": "2026-06-24 16:35:42.749516+00:00"
+      "priority_score": 25.0,
+      "eligibility": "Families in the United States affected by Autism Spectrum Disorders",
+      "notes": "Official page says grants can help up to $5000; check current application window before applying.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742347+00:00",
+      "updated_at": "2026-06-24 20:33:22.742347+00:00"
+    },
+    {
+      "id": 2,
+      "grant_name": "Modest Needs Self-Sufficiency Grant",
+      "source_url": "https://www.modestneeds.org/mn/about-us/grants/self-sufficiency-grants",
+      "funding_amount": 1000.0,
+      "deadline": null,
+      "application_difficulty": 2,
+      "status": "research",
+      "priority_score": 21.0,
+      "eligibility": "Working households facing a short-term emergency expense",
+      "notes": "Official program page; application availability and eligibility can change.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742335+00:00",
+      "updated_at": "2026-06-24 20:33:22.742335+00:00"
+    },
+    {
+      "id": 4,
+      "grant_name": "SSA SSI for Children",
+      "source_url": "https://www.ssa.gov/ssi/text-child-ussi.htm",
+      "funding_amount": 0.0,
+      "deadline": null,
+      "application_difficulty": 2,
+      "status": "research",
+      "priority_score": 20.0,
+      "eligibility": "Children with disabilities in low-income households",
+      "notes": "Official SSA information page; this is a benefit eligibility lead and not a private grant.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742362+00:00",
+      "updated_at": "2026-06-24 20:33:22.742363+00:00"
     },
     {
       "id": 7,
@@ -74,9 +119,12 @@
       "deadline": null,
       "application_difficulty": 2,
       "status": "research",
-      "priority_score": -7.0,
-      "created_at": "2026-06-24 16:35:42.749530+00:00",
-      "updated_at": "2026-06-24 16:35:42.749531+00:00"
+      "priority_score": 20.0,
+      "eligibility": "State and local rent assistance search resource",
+      "notes": "Official USAGov page points users to 211 and state or local emergency rental assistance programs.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742390+00:00",
+      "updated_at": "2026-06-24 20:33:22.742391+00:00"
     },
     {
       "id": 8,
@@ -86,33 +134,12 @@
       "deadline": null,
       "application_difficulty": 2,
       "status": "research",
-      "priority_score": -7.0,
-      "created_at": "2026-06-24 16:35:42.749539+00:00",
-      "updated_at": "2026-06-24 16:35:42.749540+00:00"
-    },
-    {
-      "id": 2,
-      "grant_name": "Modest Needs Self-Sufficiency Grant",
-      "source_url": "https://www.modestneeds.org/mn/about-us/grants/self-sufficiency-grants",
-      "funding_amount": 1000.0,
-      "deadline": null,
-      "application_difficulty": 3,
-      "status": "research",
-      "priority_score": -9.0,
-      "created_at": "2026-06-24 16:35:42.749512+00:00",
-      "updated_at": "2026-06-24 16:35:42.749513+00:00"
-    },
-    {
-      "id": 4,
-      "grant_name": "SSA SSI for Children",
-      "source_url": "https://www.ssa.gov/ssi/text-child-ussi.htm",
-      "funding_amount": 0.0,
-      "deadline": null,
-      "application_difficulty": 4,
-      "status": "research",
-      "priority_score": -13.0,
-      "created_at": "2026-06-24 16:35:42.749519+00:00",
-      "updated_at": "2026-06-24 16:35:42.749520+00:00"
+      "priority_score": 5.0,
+      "eligibility": "Scholarship search resource for education and training",
+      "notes": "U.S. Department of Labor-sponsored search tool; verify each scholarship on its sponsor site.",
+      "action": "Check eligibility, gather documents, and apply from the official source.",
+      "created_at": "2026-06-24 20:33:22.742408+00:00",
+      "updated_at": "2026-06-24 20:33:22.742408+00:00"
     }
   ]
 }

@@ -2,47 +2,47 @@
   "summary": {
     "itemCount": 3,
     "categoryCount": 2,
-    "totalEstimatedValue": 1299.0,
-    "topItemValue": 1179.0
+    "totalEstimatedValue": 1258.0,
+    "topItemValue": 1164.0
   },
   "items": [
     {
       "item_id": 1,
       "item_name": "Nikon Z6 II Camera Kit",
-      "category": "Photography",
-      "estimated_market_value": 1179.0,
+      "category": "Good",
+      "estimated_market_value": 1164.0,
       "quantity": 1,
       "source_url": "https://www.mpb.com/en-us/product/nikon-z6-ii",
-      "notes": "Use the current MPB listing range as a comparable source; verify shutter count and included accessories.",
-      "acquired_at": "2026-06-24 16:35:42.749612+00:00",
-      "created_at": "2026-06-24 16:35:42.749616+00:00",
-      "updated_at": "2026-06-24 16:35:42.749617+00:00",
-      "total_estimated_value": 1179.0
+      "notes": "Comparable source for used camera-body pricing; verify shutter count accessories and condition.",
+      "acquired_at": "2026-06-24 20:33:22.788909+00:00",
+      "created_at": "2026-06-24 20:33:22.788910+00:00",
+      "updated_at": "2026-06-24 20:33:22.788911+00:00",
+      "total_estimated_value": 1164.0
     },
     {
       "item_id": 2,
       "item_name": "Canon EF 50mm f/1.8 STM Lens",
-      "category": "Photography",
-      "estimated_market_value": 120.0,
+      "category": "Good",
+      "estimated_market_value": 94.0,
       "quantity": 1,
       "source_url": "https://www.mpb.com/en-us/product/canon-ef-50mm-f-1-8-stm",
-      "notes": "Use the current MPB product page as a comparable source; verify condition and included caps.",
-      "acquired_at": "2026-06-24 16:35:42.749613+00:00",
-      "created_at": "2026-06-24 16:35:42.749621+00:00",
-      "updated_at": "2026-06-24 16:35:42.749622+00:00",
-      "total_estimated_value": 120.0
+      "notes": "Comparable source for used lens pricing; verify mount caps optics and condition.",
+      "acquired_at": "2026-06-24 20:33:22.788916+00:00",
+      "created_at": "2026-06-24 20:33:22.788916+00:00",
+      "updated_at": "2026-06-24 20:33:22.788917+00:00",
+      "total_estimated_value": 94.0
     },
     {
       "item_id": 3,
-      "item_name": "Completed Listings Research",
+      "item_name": "Unidentified Collectible Item",
       "category": "General",
       "estimated_market_value": 0.0,
       "quantity": 1,
       "source_url": "https://pages.ebay.com/ga/en-us/completedlistings/",
-      "notes": "Use completed or sold listings to confirm market value before pricing a real item.",
-      "acquired_at": "2026-06-24 16:35:42.749614+00:00",
-      "created_at": "2026-06-24 16:35:42.749625+00:00",
-      "updated_at": "2026-06-24 16:35:42.749625+00:00",
+      "notes": "Use completed listings only and update search terms to match the real item.",
+      "acquired_at": "2026-06-24 20:33:22.788921+00:00",
+      "created_at": "2026-06-24 20:33:22.788922+00:00",
+      "updated_at": "2026-06-24 20:33:22.788922+00:00",
       "total_estimated_value": 0.0
     }
   ]

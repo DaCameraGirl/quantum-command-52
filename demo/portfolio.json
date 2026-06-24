@@ -13,7 +13,7 @@
       "paper_cash": 242.36,
       "expected_return": 0.24,
       "volatility": 0.46,
-      "updated_at": "2026-06-24 16:35:42.752106+00:00"
+      "updated_at": "2026-06-24 20:33:22.790054+00:00"
     },
     {
       "ticker": "ETH",
@@ -22,7 +22,7 @@
       "paper_cash": 238.88,
       "expected_return": 0.18,
       "volatility": 0.42,
-      "updated_at": "2026-06-24 16:35:42.752106+00:00"
+      "updated_at": "2026-06-24 20:33:22.790054+00:00"
     },
     {
       "ticker": "SOL",
@@ -31,7 +31,7 @@
       "paper_cash": 239.42,
       "expected_return": 0.35,
       "volatility": 0.62,
-      "updated_at": "2026-06-24 16:35:42.752106+00:00"
+      "updated_at": "2026-06-24 20:33:22.790054+00:00"
     },
     {
       "ticker": "NVDA",
@@ -40,7 +40,7 @@
       "paper_cash": 279.34,
       "expected_return": 0.28,
       "volatility": 0.38,
-      "updated_at": "2026-06-24 16:35:42.752106+00:00"
+      "updated_at": "2026-06-24 20:33:22.790054+00:00"
     }
   ],
   "history": [
@@ -50,7 +50,7 @@
       "weighted_return": 0.2632,
       "weighted_risk": 0.2362,
       "asset_count": 4,
-      "created_at": "2026-06-24 16:35:42.752128+00:00"
+      "created_at": "2026-06-24 20:33:22.790072+00:00"
     }
   ],
   "telemetry": [
@@ -59,14 +59,14 @@
       "backend": "memory",
       "metric_name": "weighted_return",
       "metric_value": 0.2632,
-      "created_at": "2026-06-24 16:35:42.752130+00:00"
+      "created_at": "2026-06-24 20:33:22.790074+00:00"
     },
     {
       "run_id": "demo-local",
       "backend": "memory",
       "metric_name": "weighted_risk",
       "metric_value": 0.2362,
-      "created_at": "2026-06-24 16:35:42.752131+00:00"
+      "created_at": "2026-06-24 20:33:22.790075+00:00"
     }
   ]
 }

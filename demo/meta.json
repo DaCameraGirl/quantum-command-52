@@ -1,0 +1,30 @@
+{
+  "source": "csv",
+  "loadedAt": "2026-06-24T20:33:22.789001+00:00",
+  "dataDirectory": "data",
+  "files": {
+    "grants": {
+      "path": "data/grants.csv",
+      "modifiedAt": "2026-06-24T20:33:08.695522+00:00",
+      "sizeBytes": 2557
+    },
+    "housing": {
+      "path": "data/housing_violations.csv",
+      "modifiedAt": "2026-06-24T20:33:08.697190+00:00",
+      "sizeBytes": 1022
+    },
+    "inventory": {
+      "path": "data/shell_items.csv",
+      "modifiedAt": "2026-06-24T20:33:08.697190+00:00",
+      "sizeBytes": 630
+    }
+  },
+  "error": null,
+  "counts": {
+    "grants": 9,
+    "housing": 5,
+    "inventory": 3
+  },
+  "exportedAt": "2026-06-24T20:33:22.789045+00:00",
+  "pagesMode": "csv_snapshot"
+}
