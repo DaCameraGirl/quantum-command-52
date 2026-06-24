@@ -5,7 +5,20 @@
 # Quantum Command 52
 
 <p align="center">
-  <a href="https://dacameragirl.github.io/quantum-command-52/"><img src="https://img.shields.io/badge/🌐_Live_Demo-38bdf8?style=for-the-badge&labelColor=0b1220" alt="Live demo"/></a>
+  <a href="README.md"><img src="https://img.shields.io/badge/🇺🇸_English-38bdf8?style=for-the-badge&labelColor=070b12" alt="English"/></a>
+  <a href="README.es.md"><img src="https://img.shields.io/badge/🇪🇸_Español-132033?style=for-the-badge&labelColor=070b12" alt="Español"/></a>
+  <a href="README.fr.md"><img src="https://img.shields.io/badge/🇫🇷_Français-132033?style=for-the-badge&labelColor=070b12" alt="Français"/></a>
+  <a href="README.de.md"><img src="https://img.shields.io/badge/🇩🇪_Deutsch-132033?style=for-the-badge&labelColor=070b12" alt="Deutsch"/></a>
+  <a href="README.pt-BR.md"><img src="https://img.shields.io/badge/🇧🇷_Português-132033?style=for-the-badge&labelColor=070b12" alt="Português"/></a>
+  <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/🇨🇳_中文-132033?style=for-the-badge&labelColor=070b12" alt="中文"/></a>
+  <a href="README.ja.md"><img src="https://img.shields.io/badge/🇯🇵_日本語-132033?style=for-the-badge&labelColor=070b12" alt="日本語"/></a>
+  <a href="README.ko.md"><img src="https://img.shields.io/badge/🇰🇷_한국어-132033?style=for-the-badge&labelColor=070b12" alt="한국어"/></a>
+  <a href="README.it.md"><img src="https://img.shields.io/badge/🇮🇹_Italiano-132033?style=for-the-badge&labelColor=070b12" alt="Italiano"/></a>
+  <a href="README.ar.md"><img src="https://img.shields.io/badge/🇸🇦_العربية-132033?style=for-the-badge&labelColor=070b12" alt="العربية"/></a>
+</p>
+
+<p align="center">
+  <a href="https://dacameragirl.github.io/quantum-command-52/"><img src="https://img.shields.io/badge/🌐_Live_Demo-38bdf8?style=for-the-badge&labelColor=070b12" alt="Live demo"/></a>
   <a href="https://dacameragirl.github.io/links/"><img src="https://img.shields.io/badge/🔗_Project_Hub-132033?style=for-the-badge&labelColor=070b12" alt="Project hub"/></a>
   <img src="https://img.shields.io/badge/Qiskit-IBM-6929C4?style=for-the-badge&logo=qiskit&logoColor=white" alt="Qiskit"/>
   <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white&labelColor=070b12" alt="Python"/>
