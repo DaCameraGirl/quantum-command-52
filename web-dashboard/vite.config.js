@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  base: process.env.GITHUB_PAGES === "true" ? "/quantum-command-52/" : "/",
   plugins: [react(), tailwindcss()],
   build: {
     rollupOptions: {
