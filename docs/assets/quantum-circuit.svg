@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 220" role="img" aria-label="Animated quantum circuit — qubits, gates, entanglement">
+  <defs>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#132033"/>
+      <stop offset="50%" stop-color="#070b12"/>
+      <stop offset="100%" stop-color="#050a12"/>
+    </linearGradient>
+    <radialGradient id="pulse" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="round"><rect width="620" height="220" rx="18"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect width="620" height="220" fill="url(#panel)"/>
+    <rect width="620" height="220" fill="url(#pulse)" opacity="0.35">
+      <animate attributeName="opacity" values="0.15;0.45;0.15" dur="5s" repeatCount="indefinite"/>
+    </rect>
+
+    <!-- circuit wires -->
+    <g stroke="#263244" stroke-width="2">
+      <line x1="40" y1="70" x2="580" y2="70"/>
+      <line x1="40" y1="110" x2="580" y2="110"/>
+      <line x1="40" y1="150" x2="580" y2="150"/>
+    </g>
+
+    <!-- qubit labels -->
+    <g font-family="ui-monospace, monospace" font-size="12" fill="#9fb2ca">
+      <text x="18" y="74">|q0⟩</text>
+      <text x="18" y="114">|q1⟩</text>
+      <text x="18" y="154">|q2⟩</text>
+    </g>
+
+    <!-- H gate -->
+    <g transform="translate(110 70)">
+      <rect x="-18" y="-18" width="36" height="36" rx="6" fill="#0b1220" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="0" y="6" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#38bdf8">H</text>
+    </g>
+
+    <!-- CNOT control + target -->
+    <circle cx="230" cy="70" r="7" fill="none" stroke="#f97316" stroke-width="2">
+      <animate attributeName="r" values="5;8;5" dur="2.2s" repeatCount="indefinite"/>
+    </circle>
+    <line x1="230" y1="70" x2="230" y2="110" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.8">
+      <animate attributeName="stroke-dashoffset" values="0;14" dur="1.5s" repeatCount="indefinite"/>
+    </line>
+    <g transform="translate(230 110)">
+      <circle cx="0" cy="0" r="14" fill="none" stroke="#f97316" stroke-width="2"/>
+      <line x1="-10" y1="0" x2="10" y2="0" stroke="#f97316" stroke-width="2"/>
+      <line x1="0" y1="-10" x2="0" y2="10" stroke="#f97316" stroke-width="2"/>
+    </g>
+
+    <!-- Rz gate -->
+    <g transform="translate(330 150)">
+      <rect x="-20" y="-18" width="40" height="36" rx="6" fill="#0b1220" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="0" y="6" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#38bdf8">Rz</text>
+    </g>
+
+    <!-- measure -->
+    <g transform="translate(470 110)">
+      <path d="M-16 -12 L16 -12 L16 12 L0 20 L-16 12 Z" fill="#0b1220" stroke="#9fb2ca" stroke-width="1.5"/>
+      <line x1="-8" y1="2" x2="8" y2="2" stroke="#38bdf8" stroke-width="1.5"/>
+      <line x1="0" y1="2" x2="5" y2="-6" stroke="#38bdf8" stroke-width="1.5"/>
+    </g>
+
+    <!-- moving excitation (statevector pulse) -->
+    <circle r="6" fill="#38bdf8" opacity="0.95">
+      <animateMotion path="M 40 70 L 110 70 L 230 70 L 330 70 L 470 70 L 580 70" dur="6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;1;0.4" dur="1.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="5" fill="#f97316" opacity="0.85">
+      <animateMotion path="M 40 110 L 230 110 L 470 110 L 580 110" dur="5s" begin="0.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="5" fill="#a78bfa" opacity="0.8">
+      <animateMotion path="M 40 150 L 330 150 L 580 150" dur="4.5s" begin="1.2s" repeatCount="indefinite"/>
+    </circle>
+
+    <!-- Bloch hint -->
+    <g transform="translate(520 38)">
+      <circle cx="0" cy="0" r="22" fill="none" stroke="#38bdf8" stroke-opacity="0.3" stroke-width="1"/>
+      <ellipse cx="0" cy="0" rx="22" ry="8" fill="none" stroke="#f97316" stroke-opacity="0.4" stroke-width="1">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="10s" repeatCount="indefinite"/>
+      </ellipse>
+      <circle cx="0" cy="-8" r="3" fill="#38bdf8">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="10s" repeatCount="indefinite"/>
+      </circle>
+    </g>
+
+    <g font-family="Segoe UI, Arial, sans-serif" font-size="10" font-weight="700" fill="#9fb2ca">
+      <text x="24" y="24">QAOA · QML · IBM RUNTIME</text>
+      <text x="24" y="200" fill="#38bdf8">● statevector</text>
+      <text x="130" y="200">paper research only</text>
+      <text x="430" y="200">52-qubit command deck</text>
+    </g>
+
+    <rect x="24" y="44" width="572" height="1" fill="#263244" opacity="0.7"/>
+    <rect x="24" y="44" width="200" height="1" fill="#38bdf8" opacity="0.8">
+      <animate attributeName="width" values="80;280;80" dur="4s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+</svg>
