@@ -1,0 +1,90 @@
+{
+  "mode": "quantum",
+  "label": "Quantum QAOA dashboard preview",
+  "backend": "fast local QAOA preview",
+  "description": "Fast UI preview. Run the strict macro QAOA mode for full QUBO-to-Ising statevector optimization.",
+  "artifactCommand": "py -3.11 strict_macro_quantum_v10.py --optimizer-mode qaoa",
+  "summary": {
+    "paperCapital": 0.0,
+    "expectedReturn": 0.274,
+    "risk": 0.249,
+    "score": 1.1005,
+    "adviceBoundary": "Paper research output only. Not live trading advice."
+  },
+  "allocations": [
+    {
+      "ticker": "BTC",
+      "name": "Bitcoin",
+      "weight": 0.266645,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.24,
+      "volatility": 0.46
+    },
+    {
+      "ticker": "ETH",
+      "name": "Ethereum",
+      "weight": 0.145994,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.18,
+      "volatility": 0.42
+    },
+    {
+      "ticker": "SOL",
+      "name": "Solana",
+      "weight": 0.275204,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.35,
+      "volatility": 0.62
+    },
+    {
+      "ticker": "NVDA",
+      "name": "NVIDIA Corp",
+      "weight": 0.312157,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.28,
+      "volatility": 0.38
+    }
+  ],
+  "convergence": [
+    {
+      "cycle": 1,
+      "score": 0.4418,
+      "loss": 0.36
+    },
+    {
+      "cycle": 2,
+      "score": 0.4896,
+      "loss": 0.24
+    },
+    {
+      "cycle": 3,
+      "score": 0.5236,
+      "loss": 0.18
+    },
+    {
+      "cycle": 4,
+      "score": 0.5499,
+      "loss": 0.144
+    },
+    {
+      "cycle": 5,
+      "score": 0.5714,
+      "loss": 0.12
+    },
+    {
+      "cycle": 6,
+      "score": 0.5896,
+      "loss": 0.1029
+    },
+    {
+      "cycle": 7,
+      "score": 0.6054,
+      "loss": 0.09
+    },
+    {
+      "cycle": 8,
+      "score": 0.6193,
+      "loss": 0.08
+    }
+  ]
+}

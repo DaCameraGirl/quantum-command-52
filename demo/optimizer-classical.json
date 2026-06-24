@@ -1,0 +1,90 @@
+{
+  "mode": "classical",
+  "label": "Classical risk-adjusted solver",
+  "backend": "local scipy-style paper solver",
+  "description": "Deterministic Sharpe-style scoring for practical paper allocation analysis.",
+  "artifactCommand": "py -3.11 strict_macro_quantum_v10.py --optimizer-mode classical",
+  "summary": {
+    "paperCapital": 0.0,
+    "expectedReturn": 0.2702,
+    "risk": 0.2419,
+    "score": 1.1167,
+    "adviceBoundary": "Paper research output only. Not live trading advice."
+  },
+  "allocations": [
+    {
+      "ticker": "BTC",
+      "name": "Bitcoin",
+      "weight": 0.232311,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.24,
+      "volatility": 0.46
+    },
+    {
+      "ticker": "ETH",
+      "name": "Ethereum",
+      "weight": 0.188172,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.18,
+      "volatility": 0.42
+    },
+    {
+      "ticker": "SOL",
+      "name": "Solana",
+      "weight": 0.26135,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.35,
+      "volatility": 0.62
+    },
+    {
+      "ticker": "NVDA",
+      "name": "NVIDIA Corp",
+      "weight": 0.318166,
+      "paperCapital": 0.0,
+      "expectedReturn": 0.28,
+      "volatility": 0.38
+    }
+  ],
+  "convergence": [
+    {
+      "cycle": 1,
+      "score": 0.467,
+      "loss": 0.539
+    },
+    {
+      "cycle": 2,
+      "score": 0.514,
+      "loss": 0.498
+    },
+    {
+      "cycle": 3,
+      "score": 0.561,
+      "loss": 0.457
+    },
+    {
+      "cycle": 4,
+      "score": 0.608,
+      "loss": 0.416
+    },
+    {
+      "cycle": 5,
+      "score": 0.655,
+      "loss": 0.375
+    },
+    {
+      "cycle": 6,
+      "score": 0.702,
+      "loss": 0.334
+    },
+    {
+      "cycle": 7,
+      "score": 0.749,
+      "loss": 0.293
+    },
+    {
+      "cycle": 8,
+      "score": 0.796,
+      "loss": 0.252
+    }
+  ]
+}

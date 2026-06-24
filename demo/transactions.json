@@ -1,0 +1,158 @@
+{
+  "summary": {
+    "activeDealCount": 3,
+    "activeDealValue": 1622400.0,
+    "earnestExposure": 34500.0,
+    "deadlineBreachCount": 0,
+    "dueThisWeekCount": 7
+  },
+  "deals": [
+    {
+      "id": "TX-1",
+      "transactionId": 1,
+      "listingId": 1,
+      "stage": "listing",
+      "address": "418 Harbor View Lane",
+      "city": "Charleston",
+      "state": "SC",
+      "zip": "29401",
+      "price": 485000.0,
+      "listingPrice": 485000.0,
+      "agent": "Angela Demo",
+      "client": "Seller file",
+      "escrow": "Pending offer",
+      "earnestMoney": 0.0,
+      "closingDate": "2026-08-05",
+      "milestones": [
+        {
+          "id": 101,
+          "name": "Seller disclosure packet",
+          "dueDate": "2026-06-26",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Upload signed disclosure before offer review.",
+          "risk": "critical"
+        },
+        {
+          "id": 102,
+          "name": "MLS photo review",
+          "dueDate": "2026-06-28",
+          "completed": false,
+          "completedAt": null,
+          "critical": false,
+          "notes": "Confirm image order and feature sheet.",
+          "risk": "watch"
+        },
+        {
+          "id": 103,
+          "name": "Offer review window",
+          "dueDate": "2026-07-03",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Calendar seller response deadline.",
+          "risk": "clear"
+        }
+      ]
+    },
+    {
+      "id": "TX-2",
+      "transactionId": 2,
+      "listingId": 2,
+      "stage": "under_contract",
+      "address": "92 Cedar Mill Court",
+      "city": "Raleigh",
+      "state": "NC",
+      "zip": "27601",
+      "price": 612500.0,
+      "listingPrice": 612500.0,
+      "agent": "Angela Demo",
+      "client": "Buyer file",
+      "escrow": "Atlantic Title",
+      "earnestMoney": 18500.0,
+      "closingDate": "2026-07-22",
+      "milestones": [
+        {
+          "id": 201,
+          "name": "Inspection contingency",
+          "dueDate": "2026-06-25",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Deposit exposure begins if missed.",
+          "risk": "critical"
+        },
+        {
+          "id": 202,
+          "name": "Appraisal ordered",
+          "dueDate": "2026-06-29",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Confirm lender order and access.",
+          "risk": "watch"
+        },
+        {
+          "id": 203,
+          "name": "Loan approval deadline",
+          "dueDate": "2026-07-07",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Financing condition drop-dead date.",
+          "risk": "clear"
+        }
+      ]
+    },
+    {
+      "id": "TX-3",
+      "transactionId": 3,
+      "listingId": 3,
+      "stage": "closing",
+      "address": "1509 Ridgecrest Avenue",
+      "city": "Nashville",
+      "state": "TN",
+      "zip": "37203",
+      "price": 524900.0,
+      "listingPrice": 524900.0,
+      "agent": "Angela Demo",
+      "client": "Relocation file",
+      "escrow": "Keystone Settlement",
+      "earnestMoney": 16000.0,
+      "closingDate": "2026-06-29",
+      "milestones": [
+        {
+          "id": 301,
+          "name": "Clear to close",
+          "dueDate": "2026-06-24",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Confirm final lender status.",
+          "risk": "critical"
+        },
+        {
+          "id": 302,
+          "name": "Wire instructions verified",
+          "dueDate": "2026-06-26",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Call title company before transfer.",
+          "risk": "critical"
+        },
+        {
+          "id": 303,
+          "name": "Closing appointment",
+          "dueDate": "2026-06-29",
+          "completed": false,
+          "completedAt": null,
+          "critical": true,
+          "notes": "Final signature window.",
+          "risk": "watch"
+        }
+      ]
+    }
+  ]
+}
