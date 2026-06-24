@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 280" role="img" aria-label="Quantum Command 52 — IBM/Qiskit lab with resource ledgers">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#132033"/>
+      <stop offset="45%" stop-color="#070b12"/>
+      <stop offset="100%" stop-color="#050a12"/>
+    </linearGradient>
+    <radialGradient id="glowCyan" cx="50%" cy="0%" r="70%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.34"/>
+      <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowOrange" cx="88%" cy="20%" r="45%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.26"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f8fbff"/>
+      <stop offset="40%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M 44 0 L 0 0 0 44" fill="none" stroke="#263244" stroke-width="1" opacity="0.5"/>
+    </pattern>
+    <clipPath id="round"><rect width="1200" height="280" rx="24"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect width="1200" height="280" fill="url(#sky)"/>
+    <rect width="1200" height="280" fill="url(#glowCyan)"/>
+    <rect width="1200" height="280" fill="url(#glowOrange)"/>
+    <rect width="1200" height="280" fill="url(#grid)" opacity="0.55"/>
+    <ellipse cx="600" cy="300" rx="520" ry="120" fill="#38bdf8" opacity="0.04"/>
+
+    <g transform="translate(1020 78)">
+      <circle cx="0" cy="0" r="34" fill="none" stroke="#38bdf8" stroke-opacity="0.35" stroke-width="1.2">
+        <animate attributeName="r" values="28;36;28" dur="4s" repeatCount="indefinite"/>
+      </circle>
+      <ellipse cx="0" cy="0" rx="34" ry="12" fill="none" stroke="#f97316" stroke-opacity="0.45" stroke-width="1">
+        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="12s" repeatCount="indefinite"/>
+      </ellipse>
+      <circle cx="0" cy="-10" r="5" fill="#38bdf8" opacity="0.9">
+        <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>
+      </circle>
+      <line x1="0" y1="-10" x2="0" y2="14" stroke="#9fb2ca" stroke-width="1.2" opacity="0.7"/>
+      <circle cx="0" cy="14" r="4" fill="#f97316" opacity="0.85"/>
+    </g>
+
+    <text x="600" y="108" text-anchor="middle" font-family="Bahnschrift, Segoe UI, Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="-1.5" fill="url(#titleGrad)">Quantum Command 52</text>
+    <text x="600" y="148" text-anchor="middle" font-family="Bahnschrift, Segoe UI, Arial, sans-serif" font-size="18" font-weight="600" fill="#9fb2ca">Local-first IBM/Qiskit lab · grants · housing · catalog · quantum research</text>
+    <rect x="260" y="172" width="680" height="2" rx="1" fill="#263244"/>
+    <rect x="360" y="172" width="480" height="2" rx="1" fill="#38bdf8" opacity="0.75">
+      <animate attributeName="opacity" values="0.4;1;0.4" dur="3.5s" repeatCount="indefinite"/>
+    </rect>
+    <text x="600" y="208" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#9fb2ca">Qiskit · IBM Quantum Runtime · React dashboard · read-only Pages demo</text>
+    <text x="600" y="234" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600" fill="#38bdf8">Not billing · not real-estate · not guaranteed outcomes</text>
+  </g>
+</svg>

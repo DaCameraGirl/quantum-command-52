@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 72" role="img" aria-label="Local-first quantum lab — not billing, not guaranteed outcomes">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#132033"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="72" rx="14" fill="url(#bg)" stroke="#263244" stroke-width="1"/>
+  <text x="58" y="30" font-family="Bahnschrift, Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#f8fbff">⚛ Local-first IBM/Qiskit lab with practical resource ledgers</text>
+  <text x="58" y="50" font-family="Segoe UI, Arial, sans-serif" font-size="12" fill="#9fb2ca">Not Stripe · not real-estate · not guaranteed grants or legal outcomes · organize real links + experiments</text>
+  <circle cx="28" cy="36" r="8" fill="#38bdf8" opacity="0.2">
+    <animate attributeName="r" values="6;10;6" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="28" cy="36" r="4" fill="#38bdf8"/>
+  <text x="820" y="38" text-anchor="end" font-family="ui-monospace, monospace" font-size="11" fill="#f97316" opacity="0.9">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2s" repeatCount="indefinite"/>|ψ⟩
+  </text>
+</svg>
