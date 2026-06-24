@@ -49,6 +49,7 @@ const STATIC_DEMO = import.meta.env.PROD && /\.github\.io$/i.test(window.locatio
 
 const STATIC_GET_ROUTES = {
   "/api/me": "demo/me.json",
+  "/api/meta": "demo/meta.json",
   "/api/grants": "demo/grants.json",
   "/api/housing": "demo/housing.json",
   "/api/inventory": "demo/inventory.json",
@@ -57,6 +58,69 @@ const STATIC_GET_ROUTES = {
   "/api/optimizer/runs": "demo/optimizer-runs.json",
   "/api/optimizer/jobs": "demo/optimizer-jobs.json",
 };
+
+function formatMetaTimestamp(value) {
+  if (!value) return "unknown date";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+}
+
+function DataSourceBanner({ meta }) {
+  if (!meta) return null;
+
+  const counts = meta.counts;
+  const countLine =
+    counts &&
+    `${counts.grants ?? 0} grants · ${counts.housing ?? 0} housing · ${counts.inventory ?? 0} catalog rows`;
+
+  if (STATIC_DEMO) {
+    return (
+      <div className="data-source-banner snapshot" role="status">
+        <Database size={16} />
+        <div>
+          <strong>GitHub Pages snapshot</strong>
+          <p>
+            Grant, housing, and catalog stats were exported from <code>data/*.csv</code> on{" "}
+            {formatMetaTimestamp(meta.exportedAt || meta.loadedAt)}. Read-only here — desktop icon <strong>52</strong>{" "}
+            loads the same CSV files live.
+          </p>
+          {countLine && <small>{countLine}</small>}
+        </div>
+      </div>
+    );
+  }
+
+  if (meta.source === "csv") {
+    return (
+      <div className="data-source-banner live" role="status">
+        <Database size={16} />
+        <div>
+          <strong>Live CSV source</strong>
+          <p>
+            Dashboard stats are loaded from <code>data/*.csv</code> in the repo. Edit those files, then refresh this
+            page.
+          </p>
+          {countLine && <small>{countLine}</small>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="data-source-banner warning" role="status">
+      <AlertTriangle size={16} />
+      <div>
+        <strong>Seed data mode</strong>
+        <p>
+          Stats are not coming from repo CSV files. Set <code>REPO52_DATA_SOURCE=csv</code> or restore{" "}
+          <code>data/*.csv</code>.
+        </p>
+        {meta.error && <small>{meta.error}</small>}
+      </div>
+    </div>
+  );
+}
 
 async function fetchStaticDemo(path) {
   const basePath = path.split("?")[0];
@@ -98,6 +162,13 @@ function AuthPanel({ onAuth }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [dataMeta, setDataMeta] = useState(null);
+
+  useEffect(() => {
+    api("/api/meta")
+      .then((payload) => setDataMeta(payload.data || payload))
+      .catch(() => {});
+  }, []);
 
   async function submit(event) {
     event.preventDefault();
@@ -128,6 +199,7 @@ function AuthPanel({ onAuth }) {
 
   return (
     <main className="auth-shell">
+      <DataSourceBanner meta={dataMeta} />
       <section className="auth-aside">
         <div className="brand-mark">
           <CircuitBoard size={24} />
@@ -143,8 +215,8 @@ function AuthPanel({ onAuth }) {
             <span>Clickable official-source links</span>
           </div>
           <div className="security-row">
-            <Lock size={18} />
-            <span>Local demo mode available</span>
+            <Database size={18} />
+            <span>Grant, housing, and catalog stats from data/*.csv</span>
           </div>
         </div>
       </section>
@@ -183,7 +255,7 @@ function AuthPanel({ onAuth }) {
             {mode === "login" ? "Sign in" : "Create account"} <ArrowRight size={18} />
           </button>
           <button className="ghost-button demo-login-button" onClick={openDemo} type="button">
-            Open local demo
+            Sign in with demo account
           </button>
         </form>
       </section>
@@ -1009,6 +1081,7 @@ function ToolPanel({ activeTab }) {
 
 function Dashboard({ user, onLogout }) {
   const [data, setData] = useState(null);
+  const [dataMeta, setDataMeta] = useState(null);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("grants");
   const [optimizerMode, setOptimizerMode] = useState("classical");
@@ -1030,6 +1103,9 @@ function Dashboard({ user, onLogout }) {
 
   useEffect(() => {
     api("/api/portfolio").then(setData).catch((err) => setError(err.message));
+    api("/api/meta")
+      .then((payload) => setDataMeta(payload.data || payload))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1172,7 +1248,7 @@ function Dashboard({ user, onLogout }) {
     { label: "Volatility exposure", value: `${((summary.weightedRisk || 0) * 100).toFixed(2)}%`, status: "Watch" },
     { label: "Capital concentration", value: `${Math.max(...chartData.map((asset) => asset.percent), 0).toFixed(2)}%`, status: "Pass" },
     { label: "Broker execution", value: "Paper only", status: "Pass" },
-    { label: "Model drift", value: "CSV seed", status: "Watch" },
+    { label: "Ledger source", value: dataMeta?.source === "csv" ? "data/*.csv" : "seed", status: dataMeta?.source === "csv" ? "Pass" : "Watch" },
   ];
 
   const gates = [
@@ -1223,6 +1299,8 @@ function Dashboard({ user, onLogout }) {
             </button>
           </div>
         </header>
+
+        <DataSourceBanner meta={dataMeta} />
 
         {error && <div className="error-line">{error}</div>}
         {!data && !error && <div className="loading-panel">Loading resource lists...</div>}
