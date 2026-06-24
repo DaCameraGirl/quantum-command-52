@@ -1,21 +1,21 @@
 {
   "source": "csv",
-  "loadedAt": "2026-06-24T20:33:22.789001+00:00",
+  "loadedAt": "2026-06-24T20:37:56.308897+00:00",
   "dataDirectory": "data",
   "files": {
     "grants": {
       "path": "data/grants.csv",
-      "modifiedAt": "2026-06-24T20:33:08.695522+00:00",
+      "modifiedAt": "2026-06-24T20:37:41.904338+00:00",
       "sizeBytes": 2557
     },
     "housing": {
       "path": "data/housing_violations.csv",
-      "modifiedAt": "2026-06-24T20:33:08.697190+00:00",
+      "modifiedAt": "2026-06-24T20:37:41.905422+00:00",
       "sizeBytes": 1022
     },
     "inventory": {
       "path": "data/shell_items.csv",
-      "modifiedAt": "2026-06-24T20:33:08.697190+00:00",
+      "modifiedAt": "2026-06-24T20:37:41.905422+00:00",
       "sizeBytes": 630
     }
   },
@@ -25,6 +25,6 @@
     "housing": 5,
     "inventory": 3
   },
-  "exportedAt": "2026-06-24T20:33:22.789045+00:00",
+  "exportedAt": "2026-06-24T20:37:56.308942+00:00",
   "pagesMode": "csv_snapshot"
 }

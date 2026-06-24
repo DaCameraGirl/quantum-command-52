@@ -18,8 +18,8 @@
       "eligibility": "People facing homelessness who need shelter or local services",
       "notes": "Official HUD tool for shelter plus food pantry health clinic and clothing resources.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742372+00:00",
-      "updated_at": "2026-06-24 20:33:22.742373+00:00"
+      "created_at": "2026-06-24 20:37:56.290900+00:00",
+      "updated_at": "2026-06-24 20:37:56.290901+00:00"
     },
     {
       "id": 6,
@@ -33,8 +33,8 @@
       "eligibility": "People facing or experiencing homelessness",
       "notes": "Official USAGov page for emergency housing plus HUD local assistance Continuum of Care providers and 211.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742382+00:00",
-      "updated_at": "2026-06-24 20:33:22.742382+00:00"
+      "created_at": "2026-06-24 20:37:56.290909+00:00",
+      "updated_at": "2026-06-24 20:37:56.290909+00:00"
     },
     {
       "id": 9,
@@ -48,8 +48,8 @@
       "eligibility": "Women who are primary financial support for their families and pursuing education or training",
       "notes": "Award amounts and local club deadlines vary; use the official page to find the current application.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.788660+00:00",
-      "updated_at": "2026-06-24 20:33:22.788662+00:00"
+      "created_at": "2026-06-24 20:37:56.308558+00:00",
+      "updated_at": "2026-06-24 20:37:56.308559+00:00"
     },
     {
       "id": 1,
@@ -63,8 +63,8 @@
       "eligibility": "Low-income women with children pursuing education or training",
       "notes": "Official page states the 2026 foundation awards are up to $5000; verify current deadline before applying.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742314+00:00",
-      "updated_at": "2026-06-24 20:33:22.742322+00:00"
+      "created_at": "2026-06-24 20:37:56.290844+00:00",
+      "updated_at": "2026-06-24 20:37:56.290854+00:00"
     },
     {
       "id": 3,
@@ -78,8 +78,8 @@
       "eligibility": "Families in the United States affected by Autism Spectrum Disorders",
       "notes": "Official page says grants can help up to $5000; check current application window before applying.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742347+00:00",
-      "updated_at": "2026-06-24 20:33:22.742347+00:00"
+      "created_at": "2026-06-24 20:37:56.290878+00:00",
+      "updated_at": "2026-06-24 20:37:56.290879+00:00"
     },
     {
       "id": 2,
@@ -93,8 +93,8 @@
       "eligibility": "Working households facing a short-term emergency expense",
       "notes": "Official program page; application availability and eligibility can change.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742335+00:00",
-      "updated_at": "2026-06-24 20:33:22.742335+00:00"
+      "created_at": "2026-06-24 20:37:56.290867+00:00",
+      "updated_at": "2026-06-24 20:37:56.290867+00:00"
     },
     {
       "id": 4,
@@ -108,8 +108,8 @@
       "eligibility": "Children with disabilities in low-income households",
       "notes": "Official SSA information page; this is a benefit eligibility lead and not a private grant.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742362+00:00",
-      "updated_at": "2026-06-24 20:33:22.742363+00:00"
+      "created_at": "2026-06-24 20:37:56.290890+00:00",
+      "updated_at": "2026-06-24 20:37:56.290891+00:00"
     },
     {
       "id": 7,
@@ -123,8 +123,8 @@
       "eligibility": "State and local rent assistance search resource",
       "notes": "Official USAGov page points users to 211 and state or local emergency rental assistance programs.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742390+00:00",
-      "updated_at": "2026-06-24 20:33:22.742391+00:00"
+      "created_at": "2026-06-24 20:37:56.290916+00:00",
+      "updated_at": "2026-06-24 20:37:56.290917+00:00"
     },
     {
       "id": 8,
@@ -138,8 +138,8 @@
       "eligibility": "Scholarship search resource for education and training",
       "notes": "U.S. Department of Labor-sponsored search tool; verify each scholarship on its sponsor site.",
       "action": "Check eligibility, gather documents, and apply from the official source.",
-      "created_at": "2026-06-24 20:33:22.742408+00:00",
-      "updated_at": "2026-06-24 20:33:22.742408+00:00"
+      "created_at": "2026-06-24 20:37:56.290934+00:00",
+      "updated_at": "2026-06-24 20:37:56.290935+00:00"
     }
   ]
 }

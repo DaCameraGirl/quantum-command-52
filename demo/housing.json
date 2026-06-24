@@ -18,8 +18,8 @@
       "status": "open",
       "penalty": 0.0,
       "evidence_file": "",
-      "created_at": "2026-06-24 20:33:22.788777+00:00",
-      "updated_at": "2026-06-24 20:33:22.788778+00:00",
+      "created_at": "2026-06-24 20:37:56.308679+00:00",
+      "updated_at": "2026-06-24 20:37:56.308680+00:00",
       "days_unresolved": 17,
       "violation_flag": "critical_overdue"
     },
@@ -35,8 +35,8 @@
       "status": "open",
       "penalty": 0.0,
       "evidence_file": "",
-      "created_at": "2026-06-24 20:33:22.788793+00:00",
-      "updated_at": "2026-06-24 20:33:22.788794+00:00",
+      "created_at": "2026-06-24 20:37:56.308694+00:00",
+      "updated_at": "2026-06-24 20:37:56.308694+00:00",
       "days_unresolved": 17,
       "violation_flag": "critical_overdue"
     },
@@ -52,8 +52,8 @@
       "status": "open",
       "penalty": 0.0,
       "evidence_file": "",
-      "created_at": "2026-06-24 20:33:22.788806+00:00",
-      "updated_at": "2026-06-24 20:33:22.788807+00:00",
+      "created_at": "2026-06-24 20:37:56.308704+00:00",
+      "updated_at": "2026-06-24 20:37:56.308705+00:00",
       "days_unresolved": 17,
       "violation_flag": "urgent_overdue"
     },
@@ -69,8 +69,8 @@
       "status": "open",
       "penalty": 0.0,
       "evidence_file": "",
-      "created_at": "2026-06-24 20:33:22.788823+00:00",
-      "updated_at": "2026-06-24 20:33:22.788823+00:00",
+      "created_at": "2026-06-24 20:37:56.308720+00:00",
+      "updated_at": "2026-06-24 20:37:56.308721+00:00",
       "days_unresolved": 17,
       "violation_flag": "urgent_overdue"
     },
@@ -86,8 +86,8 @@
       "status": "open",
       "penalty": 0.0,
       "evidence_file": "",
-      "created_at": "2026-06-24 20:33:22.788834+00:00",
-      "updated_at": "2026-06-24 20:33:22.788834+00:00",
+      "created_at": "2026-06-24 20:37:56.308730+00:00",
+      "updated_at": "2026-06-24 20:37:56.308731+00:00",
       "days_unresolved": 17,
       "violation_flag": "urgent_overdue"
     }
