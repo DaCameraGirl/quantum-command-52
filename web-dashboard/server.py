@@ -75,6 +75,7 @@ DEMO_TABLES = {
     "optimizer_jobs": ("demo_optimizer_jobs", "job_id"),
 }
 DEMO_CORE_TABLES = ("grants", "housing", "inventory", "transactions")
+DATA_META: dict = {"source": "seed", "loadedAt": None}
 
 
 def utc_now() -> datetime:
@@ -827,12 +828,54 @@ def refresh_legacy_demo_rows() -> bool:
     )
 
 
+def apply_csv_ledgers(ledgers: dict[str, list[dict]]) -> None:
+    DEMO_DB["grants"] = ledgers["grants"]
+    DEMO_DB["housing"] = [enrich_housing_incident(incident) for incident in ledgers["housing"]]
+    DEMO_DB["inventory"] = [enrich_inventory_item(item) for item in ledgers["inventory"]]
+    DEMO_DB["transactions"] = []
+    DEMO_DB["optimizer_runs"] = DEMO_DB.get("optimizer_runs") or []
+    DEMO_DB["optimizer_jobs"] = DEMO_DB.get("optimizer_jobs") or []
+
+
+def load_csv_source_of_truth() -> bool:
+    global DATA_META
+    from repo_csv_loader import csv_data_source_enabled, load_repo_csv_ledgers
+
+    if not csv_data_source_enabled():
+        return False
+    try:
+        ledgers, DATA_META = load_repo_csv_ledgers()
+    except FileNotFoundError as exc:
+        DATA_META = {"source": "seed", "loadedAt": utc_now().isoformat(), "error": str(exc)}
+        log_event("csv_ledgers_missing", error=str(exc))
+        return False
+    for table in DEMO_DB:
+        DEMO_DB[table] = []
+    apply_csv_ledgers(ledgers)
+    save_demo_memory_to_sqlite()
+    log_event(
+        "csv_ledgers_loaded",
+        database=str(DEMO_SQLITE_FILE),
+        source="csv",
+        grants=len(DEMO_DB["grants"]),
+        housing=len(DEMO_DB["housing"]),
+        inventory=len(DEMO_DB["inventory"]),
+        files=DATA_META.get("files"),
+    )
+    return True
+
+
 def seed_demo_memory() -> None:
+    global DATA_META
     init_demo_sqlite()
+    if load_csv_source_of_truth():
+        return
+
     load_demo_memory_from_sqlite()
     if any(DEMO_DB[table] for table in DEMO_CORE_TABLES):
         if refresh_legacy_demo_rows():
             save_demo_memory_to_sqlite()
+        DATA_META = {"source": "seed_sqlite", "loadedAt": utc_now().isoformat()}
         log_event(
             "demo_sqlite_loaded",
             database=str(DEMO_SQLITE_FILE),
@@ -914,6 +957,7 @@ def seed_demo_memory() -> None:
         ]
     )
     save_demo_memory_to_sqlite()
+    DATA_META = {"source": "seed", "loadedAt": utc_now().isoformat()}
     log_event(
         "demo_sqlite_seeded",
         database=str(DEMO_SQLITE_FILE),
@@ -2811,6 +2855,23 @@ class ApiHandler(BaseHTTPRequestHandler):
                     "ok": True,
                     "database": "demo_sqlite" if local_demo_mode() else "postgresql",
                     "auth": "demo_jwt" if local_demo_mode() else "jwt",
+                    "dataSource": DATA_META.get("source"),
+                },
+            )
+            return
+
+        if path == "/api/meta":
+            self.send_json(
+                HTTPStatus.OK,
+                {
+                    "data": DATA_META,
+                    "summary": {
+                        "grants": demo_grants_payload()["summary"],
+                        "housing": demo_housing_payload()["summary"],
+                        "inventory": demo_inventory_payload()["summary"],
+                    }
+                    if local_demo_mode()
+                    else None,
                 },
             )
             return

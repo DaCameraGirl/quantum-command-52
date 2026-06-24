@@ -23,7 +23,7 @@
   <img src="https://img.shields.io/badge/Qiskit-IBM-6929C4?style=for-the-badge&logo=qiskit&logoColor=white" alt="Qiskit"/>
   <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white&labelColor=070b12" alt="Python"/>
   <img src="https://img.shields.io/badge/React-149ECA?style=for-the-badge&logo=react&logoColor=white&labelColor=070b12" alt="React"/>
-  <img src="https://img.shields.io/badge/Pages_demo-38bdf8?style=for-the-badge&labelColor=050a12" alt="Pages demo"/>
+  <img src="https://img.shields.io/badge/Pages_snapshot-38bdf8?style=for-the-badge&labelColor=050a12" alt="Pages snapshot"/>
 </p>
 
 <p align="center">
@@ -46,7 +46,7 @@ It is **not** a Stripe checkout app, not a real-estate demo, and not a promise t
 
 | What | URL |
 |---|---|
-| **Live demo** (GitHub Pages, static) | [dacameragirl.github.io/quantum-command-52](https://dacameragirl.github.io/quantum-command-52/) |
+| **Live snapshot** (GitHub Pages, CSV export) | [dacameragirl.github.io/quantum-command-52](https://dacameragirl.github.io/quantum-command-52/) |
 | **GitHub repo** | [github.com/DaCameraGirl/quantum-command-52](https://github.com/DaCameraGirl/quantum-command-52) |
 | **Full dashboard** (local API + Vite) | Desktop shortcut **52** → `Start-Repo52.ps1` |
 | **Project hub** | [dacameragirl.github.io/links](https://dacameragirl.github.io/links/) |
@@ -162,17 +162,49 @@ npm run dev
 
 Open http://127.0.0.1:5173
 
-## Local demo mode
+## Data source of truth
+
+Grant, housing, and catalog dashboard stats come from repo-root CSV files:
+
+| File | Dashboard tab |
+|---|---|
+| `data/grants.csv` | Grants |
+| `data/housing_violations.csv` | Housing |
+| `data/shell_items.csv` | Catalog |
+
+The matching CLI scripts (`grants.py`, `housing_violations.py`, `shell_catalog.py`) read the same files and write Markdown/CSV summaries to `output/`.
+
+| Surface | How stats load |
+|---|---|
+| **Desktop shortcut 52** | Live read of `data/*.csv` on each API start (`REPO52_DATA_SOURCE=csv`) |
+| **GitHub Pages** | Dated JSON snapshot in `web-dashboard/public/demo/` — regenerate before deploy |
+
+Regenerate the Pages snapshot:
+
+```powershell
+py -3.11 web-dashboard/scripts/export_pages_demo.py
+```
+
+Check live counts locally:
+
+```powershell
+curl http://127.0.0.1:8787/api/meta
+```
+
+## Local SQLite mode
 
 The shortcut starts the backend with:
 
 ```text
 REPO52_DEMO_MODE=true
+REPO52_DATA_SOURCE=csv
 APP_ENV=development
 REQUIRE_ALEMBIC_MIGRATIONS=false
 ```
 
-Uses ignored local DB: `web-dashboard/data.db` — delete to reset demo rows.
+Uses ignored local DB: `web-dashboard/data.db` for auth/session cache — delete to reset local edits. Ledger rows reload from CSV on restart when `REPO52_DATA_SOURCE=csv`.
+
+Set `REPO52_DATA_SOURCE=seed` only if you need the old in-memory seed rows for testing.
 
 ## Production database
 

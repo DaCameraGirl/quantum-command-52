@@ -1,15 +1,18 @@
-"""Export read-only demo JSON for GitHub Pages static hosting."""
+"""Export read-only JSON for GitHub Pages from repo-root data/*.csv."""
 from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from repo_csv_loader import load_repo_csv_ledgers  # noqa: E402
 from server import (  # noqa: E402
     DEMO_USER,
+    apply_csv_ledgers,
     demo_grants_payload,
     demo_housing_payload,
     demo_inventory_payload,
@@ -31,8 +34,20 @@ def write(name: str, payload: dict) -> None:
 
 
 def main() -> None:
-    seed_demo_memory()
     OUT.mkdir(parents=True, exist_ok=True)
+    try:
+        ledgers, meta = load_repo_csv_ledgers()
+        apply_csv_ledgers(ledgers)
+        meta["exportedAt"] = datetime.now(timezone.utc).isoformat()
+        meta["pagesMode"] = "csv_snapshot"
+    except FileNotFoundError as exc:
+        print(f"CSV export failed ({exc}); falling back to in-memory seed.")
+        seed_demo_memory()
+        from server import DATA_META
+
+        meta = {**DATA_META, "exportedAt": datetime.now(timezone.utc).isoformat(), "pagesMode": "seed_fallback"}
+
+    write("meta.json", meta)
     write("me.json", {"user": {"email": DEMO_USER["email"], "displayName": DEMO_USER["display_name"]}})
     write("grants.json", demo_grants_payload())
     write("housing.json", demo_housing_payload())
