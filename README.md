@@ -1,7 +1,39 @@
 <p align="center">
-  <img src="docs/assets/readme-hero.svg" alt="Quantum Command 52 — IBM/Qiskit lab with resource ledgers" width="100%"/>
+  <img src="docs/readme-banner.svg" alt="Quantum Command 52 — Quantum computing command center — simulation, visualization, and ops in the browser." width="720" />
 </p>
 
+<p align="center">
+  <strong>Quantum computing command center — simulation, visualization, and ops in the browser.</strong>
+</p>
+
+<p align="center">
+  <a href="https://dacameragirl.github.io/quantum-command-52/"><img src="https://img.shields.io/badge/Live-GitHub%20Pages-33d69f?style=for-the-badge&logo=github&logoColor=white" alt="Live demo" /></a>
+  <a href="https://github.com/DaCameraGirl/quantum-command-52"><img src="https://img.shields.io/badge/Code-GitHub-58a6ff?style=for-the-badge&logo=github&logoColor=white" alt="Source code" /></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/deploy-GitHub Pages-000000?style=flat-square&logo=github&logoColor=white" alt="deploy-GitHub Pages" />
+  <img src="https://img.shields.io/badge/stack-Python-3776AB?style=flat-square&logo=python&logoColor=white" alt="stack-Python" />
+</p>
+
+### Languages
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-70%25-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/JavaScript-20%25-F7DF1E?style=flat-square&logo=javascript&logoColor=111" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/CSS-9%25-1572B6?style=flat-square&logo=css3&logoColor=white" alt="CSS" />
+</p>
+
+### Stack
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-backend-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python-backend" />
+  <img src="https://img.shields.io/badge/GitHub Pages-live-33d69f?style=flat-square&logo=github&logoColor=white" alt="GitHub Pages-live" />
+</p>
+
+<p align="center">
+  Built by <strong>Angela Hudson</strong> · <a href="https://github.com/DaCameraGirl">DaCameraGirl</a>
+</p>
 # Quantum Command 52
 
 <p align="center">
@@ -42,7 +74,9 @@ It is **not** a Stripe checkout app, not a real-estate demo, and not a promise t
   <img src="docs/assets/readme-divider.svg" alt="" width="100%"/>
 </p>
 
-## Repo vs live
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Repo%20vs%20live&fontSize=22&fontColor=e6edf3" width="720" alt="Repo vs live" /></p>
+
 
 | What | URL |
 |---|---|
@@ -57,7 +91,9 @@ Latest cleanup notes: [CHANGELOG_REPO52_CLEANUP.md](CHANGELOG_REPO52_CLEANUP.md)
   <img src="docs/assets/readme-divider.svg" alt="" width="100%"/>
 </p>
 
-## What this is for
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=What%20this%20is%20for&fontSize=22&fontColor=e6edf3" width="720" alt="What this is for" /></p>
+
 
 | Area | What it does |
 |---|---|
@@ -71,7 +107,9 @@ Latest cleanup notes: [CHANGELOG_REPO52_CLEANUP.md](CHANGELOG_REPO52_CLEANUP.md)
   <img src="docs/assets/readme-divider.svg" alt="" width="100%"/>
 </p>
 
-## Quick start
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Quick%20start&fontSize=22&fontColor=e6edf3" width="720" alt="Quick start" /></p>
+
 
 From the repo root in PowerShell:
 
@@ -86,7 +124,9 @@ python strict_macro_quantum_v10.py --preflight
 
 Outputs land in the `output` folder.
 
-## Desktop shortcut
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Desktop%20shortcut&fontSize=22&fontColor=e6edf3" width="720" alt="Desktop shortcut" /></p>
+
 
 The desktop shortcut named **52** launches the local dashboard via `Start-Repo52.ps1`.
 
@@ -96,7 +136,9 @@ The desktop shortcut named **52** launches the local dashboard via `Start-Repo52
 | Frontend dashboard | http://127.0.0.1:5173 |
 | Icon | `assets/repo52-52.ico` |
 
-## Dashboard tabs
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Dashboard%20tabs&fontSize=22&fontColor=e6edf3" width="720" alt="Dashboard tabs" /></p>
+
 
 | Tab | Content |
 |---|---|
@@ -107,7 +149,9 @@ The desktop shortcut named **52** launches the local dashboard via `Start-Repo52
 
 **Removed from the visible app:** Billing/Stripe checkout · Real-estate Deals demo · Fake `$500,000` command-capital language
 
-## Main files
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Main%20files&fontSize=22&fontColor=e6edf3" width="720" alt="Main files" /></p>
+
 
 | File | Role |
 |---|---|
@@ -125,7 +169,9 @@ The desktop shortcut named **52** launches the local dashboard via `Start-Repo52
   <img src="docs/assets/readme-divider.svg" alt="" width="100%"/>
 </p>
 
-## IBM Quantum
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=IBM%20Quantum&fontSize=22&fontColor=e6edf3" width="720" alt="IBM Quantum" /></p>
+
 
 The strict V10 script expects enterprise dependencies and IBM Runtime access.
 
@@ -144,7 +190,9 @@ py -3.11 strict_macro_quantum_v10.py --bankroll 1000 --preview-alpaca-orders
 py -3.11 strict_macro_quantum_v10.py --bankroll 1000 --preview-alpaca-orders --submit-paper-orders
 ```
 
-## Web dashboard setup
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Web%20dashboard%20setup&fontSize=22&fontColor=e6edf3" width="720" alt="Web dashboard setup" /></p>
+
 
 ```powershell
 cd web-dashboard
@@ -162,7 +210,9 @@ npm run dev
 
 Open http://127.0.0.1:5173
 
-## Data source of truth
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Data%20source%20of%20truth&fontSize=22&fontColor=e6edf3" width="720" alt="Data source of truth" /></p>
+
 
 Grant, housing, and catalog dashboard stats come from repo-root CSV files:
 
@@ -191,7 +241,9 @@ Check live counts locally:
 curl http://127.0.0.1:8787/api/meta
 ```
 
-## Local SQLite mode
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Local%20SQLite%20mode&fontSize=22&fontColor=e6edf3" width="720" alt="Local SQLite mode" /></p>
+
 
 The shortcut starts the backend with:
 
@@ -206,7 +258,9 @@ Uses ignored local DB: `web-dashboard/data.db` for auth/session cache — delete
 
 Set `REPO52_DATA_SOURCE=seed` only if you need the old in-memory seed rows for testing.
 
-## Production database
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Production%20database&fontSize=22&fontColor=e6edf3" width="720" alt="Production database" /></p>
+
 
 ```text
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/quantum_command_52
@@ -223,7 +277,9 @@ cd web-dashboard
 py -3.11 -m alembic upgrade head
 ```
 
-## Docker
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Docker&fontSize=22&fontColor=e6edf3" width="720" alt="Docker" /></p>
+
 
 ```powershell
 Copy-Item .env.production.example .env.production
@@ -240,7 +296,9 @@ docker compose --env-file .env.production up --build
   <img src="docs/assets/readme-divider.svg" alt="" width="100%"/>
 </p>
 
-## Use it for real
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Use%20it%20for%20real&fontSize=22&fontColor=e6edf3" width="720" alt="Use it for real" /></p>
+
 
 1. Open the CSV files in `data`.
 2. Add real opportunities, resources, evidence, or items.
@@ -248,19 +306,25 @@ docker compose --env-file .env.production up --build
 4. Run the matching script.
 5. Use generated Markdown/CSV in `output`.
 
-## Limits
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Limits&fontSize=22&fontColor=e6edf3" width="720" alt="Limits" /></p>
+
 
 - No script guarantees a grant, benefit, settlement, or sale price.
 - No script is legal or financial advice.
 - Do not upload private documents from strangers or random websites.
 - Housing/legal summaries are organizers — talk to qualified legal aid for action.
 
-## Contributors
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=Contributors&fontSize=22&fontColor=e6edf3" width="720" alt="Contributors" /></p>
+
 
 - **Angela Hudson** ([DaCameraGirl](https://github.com/DaCameraGirl)) — product direction, resource data, testing
 - **Claude** — dashboard cleanup, Pages deploy, quantum scripts
 
-## License
+<p align="center"><img src="docs/readme-divider.svg" width="720" alt="" /></p>
+<p align="center"><img src="https://capsule-render.vercel.app/api?type=rect&color=070b14&height=50&section=header&text=License&fontSize=22&fontColor=e6edf3" width="720" alt="License" /></p>
+
 
 Copyright (c) 2026 Angela Nelson. All Rights Reserved.
 
